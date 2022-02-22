@@ -1,0 +1,440 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import shutil
+import pathlib
+import argparse
+import traceback
+import subprocess
+import configparser
+
+opt_rootdir = pathlib.Path("/var/lib/ckms")
+opt_destdir = pathlib.Path("/lib/modules")
+
+opt_confpath = "/etc/ckms.ini"
+opt_kernver = None
+opt_modconf = None
+opt_quiet = False
+opt_depmod = True
+opt_arch = None
+opt_jobs = None
+
+class CkmsError(Exception):
+    pass
+
+class Module:
+    def __init__(self, name, version, modpath, modconf, cfgdata):
+        self.name = name
+        self.version = version
+        self.modver = f"{name}={version}"
+        self.cfgdata = cfgdata
+        self.modpath = modpath
+        self.modconf = modconf
+        self.env = {
+            "PATH": os.environ["PATH"],
+            "SHELL": "/bin/sh",
+            "CKMS_MODNAME": name,
+            "CKMS_MODVERSION": version,
+            "CKMS_JOBS": str(opt_jobs),
+            "CKMS_ROOTDIR": str(opt_rootdir),
+            "CKMS_DESTDIR": str(opt_destdir),
+        }
+        if opt_depmod:
+            self.env["CKMS_DEPMOD"] = "1"
+        # save a list of modules
+        self.modules = []
+        modset = {}
+        for sect in cfgdata.sections():
+            if not sect.startswith("module."):
+                continue
+            sh = cfgdata[sect]
+            mn = sect.removeprefix("module.")
+            if "path" not in sh or "dest" not in sh:
+                raise CkmsError(f"malformed module section '{sect}'")
+            if mn in modset:
+                raise CkmsError(f"duplicate module '{mn}'")
+            self.modules.append((mn, sh["path"], sh["dest"]))
+        # make deterministic
+        self.modules.sort(key = lambda v: v[0])
+        # ensure we have some modules
+        if len(self.modules) == 0:
+            raise CkmsError(f"'{self.name}' has no kernel modules")
+
+    def ensure_builtins(self, kerndir, kernarch, kernver):
+        gen = self.cfgdata["general"]
+        gen["kernel_hdrdir"] = str(kerndir)
+        gen["kernel_arch"] = kernarch
+        gen["kernel_version"] = kernver
+        # expose for hooks
+        self.env["CKMS_KERNEL_HDRDIR"] = str(kerndir)
+        self.env["CKMS_KERNEL"] = kernver
+        self.env["CKMS_ARCH"] = kernarch
+
+    def shell(self, s):
+        return subprocess.run(
+            s, shell = True, cwd = self.modpath / "build", env = self.env
+        )
+
+    def do(self, cmd, *args):
+        return subprocess.run(
+            [cmd, *args], cwd = self.modpath / "build", env = self.env
+        )
+
+    def run_hook(self, hookn):
+        if "hooks" not in self.cfgdata:
+            return False
+        if hookn not in self.cfgdata["hooks"]:
+            return False
+        pret = self.shell(self.cfgdata["hooks"][hookn])
+        if pret.returncode != 0:
+            raise CkmsError(
+                f"hook '{hookn}' failed with code {pret.returncode}"
+            )
+        return True
+
+def ensure_db():
+    if not opt_rootdir.is_dir():
+        try:
+            opt_rootdir.mkdir(parents = True, exist_ok = True)
+        except:
+            raise CkmsError("could not create database directory")
+
+def get_modpath(namever):
+    eq = namever.find("=")
+
+    if eq < 0:
+        raise CkmsError(f"'{namever}' does not match format 'name=version'")
+
+    name = namever[0:eq]
+    ver = namever[eq + 1:]
+
+    if len(name) == 0 or len(ver) == 0:
+        raise CkmsError(f"'{namever}' does not match format 'name=version'")
+
+    return opt_rootdir / name / ver
+
+def read_module(modpath, by_name = False):
+    if by_name:
+        modpath = get_modpath(modpath) / "source"
+    else:
+        modpath = pathlib.Path(modpath)
+
+    if not modpath.is_dir():
+        raise CkmsError(f"module path '{cmd[1]}' does not exist")
+
+    modconf = opt_modconf
+    if not modconf:
+        modconf = modpath / "ckms.ini"
+
+    modconf = pathlib.Path(modconf)
+
+    if not modconf.is_file():
+        raise CkmsError(f"module config file not found for '{cmd[1]}'")
+
+    mcfg = configparser.ConfigParser(default_section = "general")
+    mcfg.read(modconf)
+
+    if not "general" in mcfg:
+        raise CkmsError(f"general section missing for '{modconf}'")
+
+    gen = mcfg["general"]
+
+    if not "name" in gen:
+        raise CkmsError(f"module name unknown for '{modconf}'")
+    if not "version" in gen:
+        raise CkmsError(f"module version unknown for '{modconf}'")
+
+    gen["ckms_rootdir"] = str(opt_rootdir)
+    gen["ckms_destdir"] = str(opt_destdir)
+
+    # when not registering, we want modpath not to point to the source
+    if by_name:
+        modpath = modpath.parent
+
+    return Module(gen["name"], gen["version"], modpath, modconf, mcfg)
+
+def do_add(cmd):
+    if len(cmd) < 2:
+        raise CkmsError("module path not given")
+
+    mod = read_module(cmd[1])
+
+    ensure_db()
+
+    # create module directory
+    dbpath = opt_rootdir / mod.name / mod.version
+    slpath = dbpath / "source"
+    dbpath.mkdir(parents = True, exist_ok = True)
+    # create source symlink
+    if slpath.exists() and not slpath.is_symlink():
+        raise CkmsError(f"'{slpath}' exists but is not a symlink")
+    slpath.symlink_to(mod.modpath)
+
+    print(f"ckms: added {mod.modver}")
+
+def do_remove(cmd):
+    if len(cmd) < 2:
+        raise CkmsError("module name/version not given")
+
+    mod = read_module(cmd[1], True)
+
+    can_rm = True
+
+    for f in mod.modpath.iterdir():
+        if f.name == "source" or f.name == "build":
+            continue
+        print(f"ckms: {cmd[1]} still built for '{f.name}'")
+        can_rm = False
+
+    if not can_rm:
+        raise CkmsError(f"'{mod.modpath}' has built modules")
+
+    (mod.modpath / "source").unlink(missing_ok = True)
+
+    if (mod.modpath / "build").is_dir():
+        shutil.rmtree(mod.modpath / "build")
+
+    mod.modpath.rmdir()
+
+    print(f"ckms: removed {mod.modver}")
+
+def do_clean(cmd):
+    if len(cmd) < 2:
+        raise CkmsError("module name/version not given")
+
+    mod = read_module(cmd[1], True)
+
+    kpath = mod.modpath / opt_kernver
+
+    if not kpath.is_dir():
+        raise CkmsError(f"{mod.modver} not built for {opt_kernver}")
+
+    shutil.rmtree(kpath)
+
+    print(f"ckms: cleaned {mod.modver} for {opt_kernver}")
+
+def do_build(cmd, quiet = False):
+    if len(cmd) < 2:
+        raise CkmsError("module name/version not given")
+
+    mod = read_module(cmd[1], True)
+
+    kernhdrs = pathlib.Path("/lib/modules") / opt_kernver / "build"
+
+    if not kernhdrs.is_dir():
+        raise CkmsError(f"kernel headers not installed in '{kernhdrs}'")
+
+    mod.ensure_builtins(kernhdrs, opt_arch, opt_kernver)
+
+    bpath = mod.modpath / opt_kernver / opt_arch
+    if bpath.is_dir():
+        if not quiet:
+            print(f"ckms: found built tree for {mod.modver}")
+        return mod
+
+    print("ckms: preparing build...")
+
+    bdir = mod.modpath / "build"
+    # clean first if present
+    if bdir.is_dir():
+        shutil.rmtree(bdir)
+    # copy
+    shutil.copytree(mod.modpath / "source", mod.modpath / "build")
+
+    print("ckms: configuring...")
+
+    mod.run_hook("configure")
+
+    print("ckms: building...")
+
+    mod.run_hook("pre_build")
+
+    if not mod.run_hook("build"):
+        # default behavior
+        raise CkmsError("default build hook not yet supported")
+
+    mdestb = bpath / "module"
+    if mdestb.is_dir():
+        shutil.rmtree(mdestb)
+    mdestb.mkdir(parents = True, exist_ok = True)
+
+    mod.run_hook("post_build")
+
+    print("ckms: registering...")
+
+    for modn, mpath, mdest in mod.modules:
+        print(f"ckms: registering kernel module '{modn}'")
+        modf = bdir / mpath / f"{modn}.ko"
+        destf = mdestb / mpath
+        if not modf.is_file():
+            raise CkmsError(f"kernel module '{modn}' does not exist")
+        # strip first
+        mod.do("strip", "-g", modf)
+        # then copy
+        destf.mkdir(parents = True, exist_ok = True)
+        shutil.copy(modf, destf)
+        (destf / f"{modn}.ko").chmod(0o644)
+
+    print(f"ckms: built {mod.modver} for {opt_kernver}/{opt_arch}")
+
+    return mod
+
+def do_install(cmd):
+    mod = do_build(cmd, True)
+
+    slinkn = f"kernel-{opt_kernver}-{opt_arch}"
+    slinkd = f"{mod.version}/{opt_kernver}/{opt_arch}"
+    slinkp = mod.modpath.parent / slinkn
+
+    if slinkp.is_symlink():
+        print(f"ckms: '{mod.modver}' already installed for {opt_kernver}")
+        return
+
+    print(f"ckms: installing {mod.modver} for {opt_kernver}/{opt_arch}")
+
+    for modn, mpath, mdest in mod.modules:
+        spath = mod.modpath / opt_kernver / opt_arch / "module" / mpath
+        dpath = opt_destdir / opt_kernver / mdest
+        modf = f"{modn}.ko"
+        # clean up
+        dpath.mkdir(exist_ok = True, parents = True)
+        (dpath / modf).unlink(missing_ok = True)
+        # copy the file
+        shutil.copy(spath / modf, dpath)
+
+    slinkp.symlink_to(slinkd)
+
+    print(f"ckms: installed {mod.modver} for {opt_kernver}/{opt_arch}")
+
+def do_uninstall(cmd):
+    if len(cmd) < 2:
+        raise CkmsError("module name/version not given")
+
+    kernpath = pathlib.Path("/lib/modules") / opt_kernver
+
+    if not kernpath.is_dir():
+        raise CkmsError(f"kernel modules not found in '{kernpath}'")
+
+    print(f"ckms: uninstalled {mod.modver} for {opt_kernver}")
+
+def do_status(cmd):
+    pass
+
+def main():
+    global opt_confpath, opt_kernver, opt_modconf, opt_quiet
+    global opt_depmod, opt_arch, opt_jobs
+
+    parser = argparse.ArgumentParser(
+        description = "Chimera Kernel Module System"
+    )
+    # optional args
+    parser.add_argument(
+        "-C", "--config", default = opt_confpath,
+        help = f"Path to CKMS configuration file (default: {opt_confpath})."
+    )
+    parser.add_argument(
+        "-k", "--kernver", default = None,
+        help = "Kernel version to use (default: current kernel)."
+    )
+    parser.add_argument(
+        "-c", "--modconf", default = None,
+        help = "Module config file to use (default: modpath/ckms.ini)",
+    )
+    parser.add_argument(
+        "-q", "--quiet", action = "store_const", const = True,
+        default = opt_quiet, help = "Do not log build output to stdout."
+    )
+    parser.add_argument(
+        "-D", "--no-depmod", action = "store_const", const = True,
+        default = not opt_depmod, help = "Do not run depmod after install."
+    )
+    parser.add_argument(
+        "-j", "--jobs", default = None,
+        help = "Number of build jobs (default: number of CPUs)"
+    )
+    # positional args
+    parser.add_argument(
+        "command", nargs = "+",
+        help = "The command to issue, followed by its argument(s)."
+    )
+
+    cmdline = parser.parse_args()
+
+    gcfg = configparser.ConfigParser()
+    gcfg.read(cmdline.config)
+
+    # TODO read the cfg
+
+    # command line args override everything
+
+    if cmdline.kernver:
+        opt_kernver = cmdline.kernver
+
+    if cmdline.modconf:
+        opt_modconf = cmdline.modconf
+
+    if cmdline.quiet:
+        opt_quiet = True
+
+    if cmdline.no_depmod:
+        opt_depmod = False
+
+    if cmdline.jobs:
+        opt_jobs = int(cmdline.jobs)
+
+    # some reasonable defaults
+
+    if not opt_jobs:
+        opt_jobs = os.cpu_count()
+    if not opt_jobs:
+        opt_jobs = 1
+
+    if not opt_kernver:
+        opt_kernver = os.uname().release
+
+    if not opt_arch:
+        opt_arch = os.uname().machine
+
+    # match the action
+
+    try:
+        match cmdline.command[0]:
+            case "add":
+                # add a module into the system
+                do_add(cmdline.command)
+            case "remove":
+                # remove a module from the system
+                do_remove(cmdline.command)
+            case "install":
+                # install a module for the given kernel
+                do_install(cmdline.command)
+            case "uninstall":
+                # uninstall a module from the given kernel
+                do_uninstall(cmdline.command)
+            case "build":
+                # build a module for the given kernel
+                do_build(cmdline.command)
+            case "clean":
+                # clean a module build for the given kernel
+                do_clean(cmdline.command)
+            case "status":
+                # print a module status for the given kernel
+                do_status(cmdline.command)
+            case _:
+                sys.stderr.write(
+                    f"Unknown action given: {cmdline.command[0]}\n"
+                )
+                return 1
+    except CkmsError as e:
+        print(f"ckms: ERROR: {e}")
+        return 1
+    except:
+        print(f"ckms: ERROR: internal error")
+        traceback.print_exc()
+        return 1
+
+    return 0
+
+sys.exit(main())
+
