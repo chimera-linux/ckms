@@ -399,33 +399,33 @@ def main():
     # match the action
 
     try:
-        match cmdline.command[0]:
-            case "add":
-                # add a module into the system
-                do_add(cmdline.command)
-            case "remove":
-                # remove a module from the system
-                do_remove(cmdline.command)
-            case "install":
-                # install a module for the given kernel
-                do_install(cmdline.command)
-            case "uninstall":
-                # uninstall a module from the given kernel
-                do_uninstall(cmdline.command)
-            case "build":
-                # build a module for the given kernel
-                do_build(cmdline.command)
-            case "clean":
-                # clean a module build for the given kernel
-                do_clean(cmdline.command)
-            case "status":
-                # print a module status for the given kernel
-                do_status(cmdline.command)
-            case _:
-                sys.stderr.write(
-                    f"Unknown action given: {cmdline.command[0]}\n"
-                )
-                return 1
+        action = cmdline.command[0]
+        if action == "add":
+            # add a module into the system
+            do_add(cmdline.command)
+        elif action == "remove":
+            # remove a module from the system
+            do_remove(cmdline.command)
+        elif action == "install":
+            # install a module for the given kernel
+            do_install(cmdline.command)
+        elif action == "uninstall":
+            # uninstall a module from the given kernel
+            do_uninstall(cmdline.command)
+        elif action == "build":
+            # build a module for the given kernel
+            do_build(cmdline.command)
+        elif action == "clean":
+            # clean a module build for the given kernel
+            do_clean(cmdline.command)
+        elif action == "status":
+            # print a module status for the given kernel
+            do_status(cmdline.command)
+        else:
+            sys.stderr.write(
+                f"Unknown action given: {cmdline.command[0]}\n"
+            )
+            return 1
     except CkmsError as e:
         print(f"ckms: ERROR: {e}")
         return 1

@@ -12,7 +12,7 @@ See the `examples/` directory for some module definitions.
 
 ## Requirements
 
-* Python 3.10 or newer
+* Python 3.9 or newer
 
 ## Usage
 
