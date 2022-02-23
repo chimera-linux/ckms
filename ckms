@@ -53,6 +53,8 @@ def redir_allout(logpath):
         if not opt_quiet:
             # close the pipe
             tee.stdin.close()
+        else:
+            logfile.close()
         # close the old duplicates
         os.close(oldout)
         os.close(olderr)
