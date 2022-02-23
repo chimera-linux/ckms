@@ -33,7 +33,6 @@ TBD
 * Module signing
 * More hooks
 * More validation/sanity checking
-* Prettier/more readable output
 * Quiet mode (only output build progress to log, not to stdout)
 * ...
 

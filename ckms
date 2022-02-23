@@ -20,8 +20,22 @@ opt_depmod = True
 opt_arch = None
 opt_jobs = None
 
+use_colors = True
+
 class CkmsError(Exception):
     pass
+
+def log(msg, col = "\033[1m"):
+    if use_colors:
+        sys.stdout.write(col)
+    sys.stdout.write("=> ckms: ")
+    sys.stdout.write(msg)
+    if use_colors:
+        sys.stdout.write("\033[m")
+    sys.stdout.write("\n");
+
+def log_red(msg):
+    log(msg, "\033[1m\033[31m")
 
 class Module:
     def __init__(self, name, version, modpath, modconf, cfgdata):
@@ -171,7 +185,7 @@ def do_add(cmd):
         raise CkmsError(f"'{slpath}' exists but is not a symlink")
     slpath.symlink_to(mod.modpath)
 
-    print(f"ckms: added {mod.modver}")
+    log(f"added {mod.modver}")
 
 def do_remove(cmd):
     if len(cmd) < 2:
@@ -184,7 +198,7 @@ def do_remove(cmd):
     for f in mod.modpath.iterdir():
         if f.name == "source" or f.name == "build":
             continue
-        print(f"ckms: {cmd[1]} still built for '{f.name}'")
+        log(f"{cmd[1]} still built for '{f.name}'")
         can_rm = False
 
     if not can_rm:
@@ -197,7 +211,7 @@ def do_remove(cmd):
 
     mod.modpath.rmdir()
 
-    print(f"ckms: removed {mod.modver}")
+    log(f"removed {mod.modver}")
 
 def do_clean(cmd):
     if len(cmd) < 2:
@@ -212,7 +226,7 @@ def do_clean(cmd):
 
     shutil.rmtree(kpath)
 
-    print(f"ckms: cleaned {mod.modver} for {opt_kernver}")
+    log(f"cleaned {mod.modver} for {opt_kernver}")
 
 def do_build(cmd, quiet = False):
     if len(cmd) < 2:
@@ -230,10 +244,10 @@ def do_build(cmd, quiet = False):
     bpath = mod.modpath / opt_kernver / opt_arch
     if bpath.is_dir():
         if not quiet:
-            print(f"ckms: found built tree for {mod.modver}")
+            log(f"found built tree for {mod.modver}")
         return mod
 
-    print("ckms: preparing build...")
+    log("preparing build...")
 
     bdir = mod.modpath / "build"
     # clean first if present
@@ -242,11 +256,11 @@ def do_build(cmd, quiet = False):
     # copy
     shutil.copytree(mod.modpath / "source", mod.modpath / "build")
 
-    print("ckms: configuring...")
+    log("configuring...")
 
     mod.run_hook("configure")
 
-    print("ckms: building...")
+    log("building...")
 
     mod.run_hook("pre_build")
 
@@ -261,10 +275,10 @@ def do_build(cmd, quiet = False):
 
     mod.run_hook("post_build")
 
-    print("ckms: registering...")
+    log("registering...")
 
     for modn, mpath, mdest in mod.modules:
-        print(f"ckms: registering kernel module '{modn}'")
+        log(f"registering kernel module '{modn}'")
         modf = bdir / mpath / f"{modn}.ko"
         destf = mdestb / mpath
         if not modf.is_file():
@@ -276,7 +290,7 @@ def do_build(cmd, quiet = False):
         shutil.copy(modf, destf)
         (destf / f"{modn}.ko").chmod(0o644)
 
-    print(f"ckms: built {mod.modver} for {opt_kernver}/{opt_arch}")
+    log(f"built {mod.modver} for {opt_kernver}/{opt_arch}")
 
     return mod
 
@@ -288,10 +302,10 @@ def do_install(cmd):
     slinkp = mod.modpath.parent / slinkn
 
     if slinkp.is_symlink():
-        print(f"ckms: '{mod.modver}' already installed for {opt_kernver}")
+        log(f"'{mod.modver}' already installed for {opt_kernver}")
         return
 
-    print(f"ckms: installing {mod.modver} for {opt_kernver}/{opt_arch}")
+    log(f"installing {mod.modver} for {opt_kernver}/{opt_arch}")
 
     for modn, mpath, mdest in mod.modules:
         spath = mod.modpath / opt_kernver / opt_arch / "module" / mpath
@@ -305,7 +319,7 @@ def do_install(cmd):
 
     slinkp.symlink_to(slinkd)
 
-    print(f"ckms: installed {mod.modver} for {opt_kernver}/{opt_arch}")
+    log(f"installed {mod.modver} for {opt_kernver}/{opt_arch}")
 
 def do_uninstall(cmd):
     if len(cmd) < 2:
@@ -316,7 +330,7 @@ def do_uninstall(cmd):
     if not kernpath.is_dir():
         raise CkmsError(f"kernel modules not found in '{kernpath}'")
 
-    print(f"ckms: uninstalled {mod.modver} for {opt_kernver}")
+    log(f"uninstalled {mod.modver} for {opt_kernver}")
 
 def do_status(cmd):
     pass
@@ -324,6 +338,7 @@ def do_status(cmd):
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
     global opt_depmod, opt_arch, opt_jobs
+    global use_colors
 
     parser = argparse.ArgumentParser(
         description = "Chimera Kernel Module System"
@@ -352,6 +367,10 @@ def main():
     parser.add_argument(
         "-j", "--jobs", default = None,
         help = "Number of build jobs (default: number of CPUs)"
+    )
+    parser.add_argument(
+        "-L", "--no-color", action = "store_const", const = True,
+        default = False, help = "Force plain output."
     )
     # positional args
     parser.add_argument(
@@ -396,6 +415,9 @@ def main():
     if not opt_arch:
         opt_arch = os.uname().machine
 
+    if "NO_COLOR" in os.environ or not sys.stdout.isatty() or cmdline.no_color:
+        use_colors = False
+
     # match the action
 
     try:
@@ -427,10 +449,10 @@ def main():
             )
             return 1
     except CkmsError as e:
-        print(f"ckms: ERROR: {e}")
+        log_red(f"ERROR: {e}")
         return 1
     except:
-        print(f"ckms: ERROR: internal error")
+        log_red(f"ERROR: internal error")
         traceback.print_exc()
         return 1
 
