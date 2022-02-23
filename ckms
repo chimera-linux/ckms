@@ -433,7 +433,41 @@ def do_uninstall(cmd):
     log(f"uninstalled {mod.modver} for {opt_kernver}")
 
 def do_status(cmd):
-    pass
+    if len(cmd) < 2:
+        module = None
+    else:
+        module = cmd[1]
+
+    # just in case
+    drop_privs()
+
+    for f in opt_rootdir.iterdir():
+        # just skip over junk
+        if not f.is_dir():
+            continue
+        modname = f.name
+        # specific module was given
+        if module and modname != module:
+            continue
+        # otherwise loop for versions
+        for v in f.iterdir():
+            # ditto
+            if not v.is_dir():
+                continue
+            version = v.name
+            # broken; ignore
+            if not (v / "source").is_dir():
+                continue
+            # baseline state
+            state = "added"
+            if (v / opt_kernver / opt_arch).is_dir():
+                # built or better
+                state = "built"
+                # check if it's installed too
+                if (f / f"kernel-{opt_kernver}-{opt_arch}").is_symlink():
+                    state = "installed"
+            # print whatever state we got
+            print(f"{modname}, {version}, {opt_kernver}, {opt_arch}: {state}")
 
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet

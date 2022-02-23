@@ -61,8 +61,7 @@ and therefore should be run as `root` unless you are installing into a special
 inverse of `install`, i.e. `uninstall`.
 
 If you run non-`install` (or `uninstall`) steps as `root`, CKMS will drop
-privileges to the owner of `/var/lib/ckms`. This does not apply to `status`,
-which can be run as any user (as long as it can read `/var/lib/ckms`).
+privileges to the owner of `/var/lib/ckms`.
 
 Once installed, the modules are ready to be used. CKMS will never regenerate
 your `initramfs` or perform anything other than `depmod` (which can still be
@@ -83,7 +82,6 @@ have to `uninstall` them before doing so.
 
 ## TODO
 
-* Status support
 * Configuration file reading
 * Fallback build helpers
 * Configurable make implementation
