@@ -383,7 +383,8 @@ def do_build(cmd, quiet = False):
             raise CkmsError(f"kernel module '{modn}' does not exist")
         # strip first
         if dostrip or (mod.strip and dostrip != False):
-            mod.do("strip", "-g", modf)
+            if mod.do("strip", "-g", modf).returncode != 0:
+                raise CkmsError(f"strip failed for '{modf}'")
         # then copy
         destf.mkdir(parents = True, exist_ok = True)
         shutil.copy(modf, destf)
@@ -440,14 +441,19 @@ def do_install(cmd):
         shutil.copy(spath / modf, dpath)
         # compress
         if csfx == ".gz":
-            mod.do("gzip", "-9f", modf, cwd = dpath)
+            compret = mod.do("gzip", "-9f", modf, cwd = dpath).returncode
         elif csfx == ".xz":
-            mod.do("xz", "-f", modf, cwd = dpath)
+            compret = mod.do("xz", "-f", modf, cwd = dpath).returncode
         elif csfx == ".zst":
-            mod.do(
+            compret = mod.do(
                 "zstd", "-q", "-f", "-T0", "-20", "--ultra",
                 modf, cwd = dpath
-            )
+            ).returncode
+        else:
+            compret = 0
+        # ensure this worked
+        if compret != 0:
+            raise CkmsError(f"module compression failed for '{modf}'")
 
     rdest = opt_destdir.resolve()
     kdest = pathlib.Path("/lib/modules").resolve()
