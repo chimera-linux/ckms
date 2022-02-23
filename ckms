@@ -571,7 +571,7 @@ def main():
     except CkmsError as e:
         log_red(f"ERROR: {e}")
         return 1
-    except:
+    except Exception:
         log_red(f"ERROR: internal error")
         traceback.print_exc()
         return 1
