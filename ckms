@@ -100,6 +100,10 @@ class Module:
         self.cfgdata = cfgdata
         self.modpath = modpath
         self.modconf = modconf
+        try:
+            self.strip = cfgdata["general"].getboolean("strip", fallback = True)
+        except ValueError:
+            raise CkmsError("invalid value for 'strip'")
         self.env = {
             "PATH": os.environ["PATH"],
             "SHELL": "/bin/sh",
@@ -123,7 +127,13 @@ class Module:
                 raise CkmsError(f"malformed module section '{sect}'")
             if mn in modset:
                 raise CkmsError(f"duplicate module '{mn}'")
-            self.modules.append((mn, sh["path"], sh["dest"]))
+            strip = None
+            if "strip" in sh:
+                try:
+                    strip = sh.getboolean("strip")
+                except ValueError:
+                    raise CkmsError(f"invalid value for 'strip' for '{mn}'")
+            self.modules.append((mn, sh["path"], sh["dest"], strip))
         # make deterministic
         self.modules.sort(key = lambda v: v[0])
         # ensure we have some modules
@@ -340,30 +350,19 @@ def do_build(cmd, quiet = False):
 
     log("registering...")
 
-    csfx = get_compsfx()
-
-    for modn, mpath, mdest in mod.modules:
+    for modn, mpath, mdest, dostrip in mod.modules:
         log(f"registering kernel module '{modn}'")
         modf = bdir / mpath / f"{modn}.ko"
         destf = bpath / mpath
         if not modf.is_file():
             raise CkmsError(f"kernel module '{modn}' does not exist")
         # strip first
-        mod.do("strip", "-g", modf)
+        if dostrip or (mod.strip and dostrip != False):
+            mod.do("strip", "-g", modf)
         # then copy
         destf.mkdir(parents = True, exist_ok = True)
         shutil.copy(modf, destf)
         (destf / f"{modn}.ko").chmod(0o644)
-        # compress
-        if csfx == ".gz":
-            mod.do("gzip", "-9f", destf / f"{modn}.ko")
-        elif csfx == ".xz":
-            mod.do("xz", "-f", destf / f"{modn}.ko")
-        elif csfx == ".zst":
-            mod.do(
-                "zstd", "-q", "-f", "-T0", "-20", "--ultra",
-                destf / f"{modn}.ko"
-            )
 
     # clean build dir
     shutil.rmtree(bdir)
@@ -401,22 +400,29 @@ def do_install(cmd):
 
     csfx = get_compsfx()
 
-    for modn, mpath, mdest in mod.modules:
+    for modn, mpath, mdest, dostrip in mod.modules:
         spath = bpath / "module" / mpath
         dpath = opt_destdir / opt_kernver / mdest
-        if csfx == ".gz":
-            modf = f"{modn}.ko.gz"
-        elif csfx == ".xz":
-            modf = f"{modn}.ko.xz"
-        elif csfx == ".zst":
-            modf = f"{modn}.ko.zst"
+        modf = f"{modn}.ko"
         # clean up
         dpath.mkdir(exist_ok = True, parents = True)
-        (dpath / modf).unlink(missing_ok = True)
+        # remove modules, potentially compressed
+        for f in dpath.glob(f"{modn}.ko*"):
+            f.unlink()
         # copy the file, validate just in case
-        if not spath / modf.exists():
+        if not (spath / modf).exists():
             raise CkmsError(f"module '{modf}' does not exist")
         shutil.copy(spath / modf, dpath)
+        # compress
+        if csfx == ".gz":
+            mod.do("gzip", "-9f", dpath / modf)
+        elif csfx == ".xz":
+            mod.do("xz", "-f", dpath / modf)
+        elif csfx == ".zst":
+            mod.do(
+                "zstd", "-q", "-f", "-T0", "-20", "--ultra",
+                dpath / modf
+            )
 
     slinkp.symlink_to(slinkd)
 

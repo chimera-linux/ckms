@@ -86,7 +86,6 @@ have to `uninstall` them before doing so.
 * Fallback build helpers
 * Configurable make implementation
 * More flexibility with the paths
-* Configurable stripping
 * Shell expression option for boolean metadata
 * Module signing
 * More hooks
