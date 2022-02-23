@@ -490,9 +490,8 @@ def do_uninstall(cmd):
 
     for modn, mpath, mdest, dostrip in mod.modules:
         dpath = opt_destdir / opt_kernver / mdest
-        modf = f"{modn}.ko"
-        # clean up
-        dpath.mkdir(exist_ok = True, parents = True)
+        if not dpath.is_dir():
+            continue
         # remove modules, potentially compressed
         for f in dpath.glob(f"{modn}.ko*"):
             f.unlink()
