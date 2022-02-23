@@ -119,13 +119,6 @@ class Module:
             )
         return True
 
-def ensure_db():
-    if not opt_rootdir.is_dir():
-        try:
-            opt_rootdir.mkdir(parents = True, exist_ok = True)
-        except:
-            raise CkmsError("could not create database directory")
-
 def get_modpath(namever):
     eq = namever.find("=")
 
@@ -184,8 +177,6 @@ def do_add(cmd):
     check_has_action(cmd)
 
     mod = read_module(cmd[1])
-
-    ensure_db()
 
     # create module directory
     dbpath = opt_rootdir / mod.name / mod.version
@@ -438,6 +429,9 @@ def main():
 
     if "NO_COLOR" in os.environ or not sys.stdout.isatty() or cmdline.no_color:
         use_colors = False
+
+    if not opt_rootdir.is_dir():
+        raise CkmsError(f"state directory '{opt_rootdir}' does not exist")
 
     # match the action
 
