@@ -7,6 +7,7 @@ import pathlib
 import argparse
 import traceback
 import subprocess
+import contextlib
 import configparser
 
 kern_path = pathlib.Path("/lib/modules")
@@ -24,6 +25,40 @@ opt_jobs = None
 opt_comp = None
 
 use_colors = True
+
+@contextlib.contextmanager
+def redir_allout(logpath):
+    try:
+        # save old descriptors
+        oldout = os.dup(sys.stdout.fileno())
+        olderr = os.dup(sys.stderr.fileno())
+        if opt_quiet:
+            # quiet mode: just get all stdout/stderr into logfile
+            logfile = open(logpath, "wb")
+            os.dup2(logfile.fileno(), sys.stdout.fileno())
+            os.dup2(logfile.fileno(), sys.stderr.fileno())
+        else:
+            # this will do the logging for us; this way we can get
+            # both standard output and file redirection at once
+            tee = subprocess.Popen(["tee", logpath], stdin = subprocess.PIPE)
+            # everything goes into the pipe
+            os.dup2(tee.stdin.fileno(), sys.stdout.fileno())
+            os.dup2(tee.stdin.fileno(), sys.stderr.fileno())
+        # fire
+        yield
+    finally:
+        # restore
+        os.dup2(oldout, sys.stdout.fileno())
+        os.dup2(olderr, sys.stderr.fileno())
+        if not opt_quiet:
+            # close the pipe
+            tee.stdin.close()
+        # close the old duplicates
+        os.close(oldout)
+        os.close(olderr)
+        if not opt_quiet:
+            # wait for the tee to finish
+            tee.communicate()
 
 class CkmsError(Exception):
     pass
@@ -118,7 +153,10 @@ class Module:
             return False
         if hookn not in self.cfgdata["hooks"]:
             return False
-        pret = self.shell(self.cfgdata["hooks"][hookn])
+        (self.modpath / "logs").mkdir(exist_ok = True, parents = True)
+        # redirect output into logfile as necessary
+        with redir_allout(self.modpath / f"logs/{hookn}.log"):
+            pret = self.shell(self.cfgdata["hooks"][hookn])
         if pret.returncode != 0:
             raise CkmsError(
                 f"hook '{hookn}' failed with code {pret.returncode}"
@@ -305,7 +343,7 @@ def do_build(cmd, quiet = False):
     for modn, mpath, mdest in mod.modules:
         log(f"registering kernel module '{modn}'")
         modf = bdir / mpath / f"{modn}.ko"
-        destf = mdestb.parent / mpath
+        destf = bpath / mpath
         if not modf.is_file():
             raise CkmsError(f"kernel module '{modn}' does not exist")
         # strip first
@@ -327,6 +365,10 @@ def do_build(cmd, quiet = False):
 
     # clean build dir
     shutil.rmtree(bdir)
+
+    # move logs dir into kernel-specific dir
+    if (mod.modpath / "logs").is_dir():
+        shutil.move(mod.modpath / "logs", bpath)
 
     log(f"built {mod.modver} for {opt_kernver}/{opt_arch}")
 

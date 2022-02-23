@@ -20,7 +20,6 @@ TBD
 
 ## TODO
 
-* Logging system
 * Status support
 * Configuration file reading
 * Fallback build helpers
