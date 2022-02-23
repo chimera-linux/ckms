@@ -39,15 +39,20 @@ def log(msg, col = "\033[1m"):
 def log_red(msg):
     log(msg, "\033[1m\033[31m")
 
-def check_nonroot():
-    if os.geteuid() == 0:
-        raise CkmsError("please don't run this step as root")
+def drop_privs():
+    if os.geteuid() != 0:
+        return
+    # drop privileges to owner of state directory
+    st = opt_rootdir.stat()
+    os.setgid(st.st_gid)
+    os.setuid(st.st_uid)
 
-def check_has_action(cmd):
+def check_has_action(cmd, drop_priv = True):
     if len(cmd) < 2:
         raise CkmsError("action argument not given")
 
-    check_nonroot()
+    if drop_priv:
+        drop_privs()
 
 class Module:
     def __init__(self, name, version, modpath, modconf, cfgdata):
@@ -294,10 +299,7 @@ def do_build(cmd, quiet = False):
     return mod
 
 def do_install(cmd):
-    # can/often should run this one as root
-    # previous actions must be completed first
-    if len(cmd) < 2:
-        raise CkmsError("action argument not given")
+    check_has_action(cmd, False)
 
     mod = read_module(cmd[1], True)
 
@@ -334,8 +336,7 @@ def do_install(cmd):
     log(f"installed {mod.modver} for {opt_kernver}/{opt_arch}")
 
 def do_uninstall(cmd):
-    if len(cmd) < 2:
-        raise CkmsError("module name/version not given")
+    check_has_action(cmd, False)
 
     kernpath = opt_destdir / opt_kernver
 
