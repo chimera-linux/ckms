@@ -284,7 +284,7 @@ def do_build(cmd, quiet = False):
     for modn, mpath, mdest in mod.modules:
         log(f"registering kernel module '{modn}'")
         modf = bdir / mpath / f"{modn}.ko"
-        destf = mdestb / mpath
+        destf = mdestb.parent / mpath
         if not modf.is_file():
             raise CkmsError(f"kernel module '{modn}' does not exist")
         # strip first
