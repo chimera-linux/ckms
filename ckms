@@ -438,6 +438,14 @@ def do_status(cmd):
     else:
         module = cmd[1]
 
+    modver = None
+
+    if module:
+        eq = module.find("=")
+        if eq > 0:
+            modver = module[eq + 1:]
+            module = module[0:eq]
+
     # just in case
     drop_privs()
 
@@ -455,6 +463,9 @@ def do_status(cmd):
             if not v.is_dir():
                 continue
             version = v.name
+            # specfic module version was given
+            if modver and version != modver:
+                continue
             # broken; ignore
             if not (v / "source").is_dir():
                 continue
