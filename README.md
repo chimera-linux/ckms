@@ -84,7 +84,6 @@ have to `uninstall` them before doing so.
 
 * Configuration file reading
 * Fallback build helpers
-* Configurable make implementation
 * More flexibility with the paths
 * Shell expression option for boolean metadata
 * Module signing

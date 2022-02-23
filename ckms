@@ -104,8 +104,28 @@ class Module:
             self.strip = cfgdata["general"].getboolean("strip", fallback = True)
         except ValueError:
             raise CkmsError("invalid value for 'strip'")
+        # determine make implementation, default to gnu make
+        maken = cfgdata["general"].get("make", fallback = "gmake")
+        if not shutil.which(maken):
+            do_fail = True
+            if maken == "gmake":
+                try:
+                    # check if our regular make is okay enough
+                    do_fail = not subprocess.run(
+                        ["make", "--version"], capture_output = True
+                    ).stdout.startswith(b"GNU Make")
+                except Exception:
+                    pass
+            if do_fail:
+                raise CkmsError(f"make not present: {maken}")
+            else:
+                self.make = "make"
+        else:
+            self.make = maken
+        # default environment
         self.env = {
             "PATH": os.environ["PATH"],
+            "MAKE": self.make,
             "SHELL": "/bin/sh",
             "CKMS_MODNAME": name,
             "CKMS_MODVERSION": version,
@@ -214,14 +234,14 @@ def read_module(modpath, by_name = False):
     mcfg = configparser.ConfigParser(default_section = "general")
     mcfg.read(modconf)
 
-    if not "general" in mcfg:
+    if "general" not in mcfg:
         raise CkmsError(f"general section missing for '{modconf}'")
 
     gen = mcfg["general"]
 
-    if not "name" in gen:
+    if "name" not in gen:
         raise CkmsError(f"module name unknown for '{modconf}'")
-    if not "version" in gen:
+    if "version" not in gen:
         raise CkmsError(f"module version unknown for '{modconf}'")
 
     gen["ckms_rootdir"] = str(opt_rootdir)
