@@ -17,6 +17,7 @@ opt_rootdir = "/var/lib/ckms"
 opt_destdir = str(kern_path)
 
 opt_confpath = "/etc/ckms/config.ini"
+opt_stripbin = "strip"
 opt_kernver = None
 opt_modconf = None
 opt_quiet = False
@@ -383,7 +384,7 @@ def do_build(cmd, quiet = False):
             raise CkmsError(f"kernel module '{modn}' does not exist")
         # strip first
         if dostrip or (mod.strip and dostrip != False):
-            if mod.do("strip", "-g", modf).returncode != 0:
+            if mod.do(opt_stripbin, "-g", modf).returncode != 0:
                 raise CkmsError(f"strip failed for '{modf}'")
         # then copy
         destf.mkdir(parents = True, exist_ok = True)
@@ -531,7 +532,7 @@ def do_status(cmd):
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
     global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_rootdir, opt_destdir
-    global use_colors
+    global use_colors, opt_stripbin
 
     parser = argparse.ArgumentParser(
         description = "Chimera Kernel Module System"
@@ -593,6 +594,7 @@ def main():
     opt_rootdir = pathlib.Path(ckcfg.get("statedir", fallback = opt_rootdir))
     opt_destdir = pathlib.Path(ckcfg.get("destdir", fallback = opt_destdir))
     opt_quiet = ckcfg.getboolean("quiet", fallback = False)
+    opt_stripbin = ckcfg.get("strip", fallback = opt_stripbin)
 
     # TODO read the cfg
 
