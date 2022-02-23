@@ -402,6 +402,18 @@ def do_build(cmd, quiet = False):
 
     return mod
 
+def do_depmod():
+    rdest = opt_destdir.resolve()
+    kdest = pathlib.Path("/lib/modules").resolve()
+
+    if opt_depmod and rdest == kdest:
+        dargs = ["-a"]
+        smap = pathlib.Path(f"/boot/System.map-{opt_kernver}")
+        if smap.is_file():
+            dargs += ["-F", smap]
+        if mod.do("depmod", *dargs, cwd = rdest).returncode != 0:
+            raise CkmsError(f"depmod failed for {opt_kernver}")
+
 def do_install(cmd):
     check_has_action(cmd, False)
 
@@ -456,16 +468,7 @@ def do_install(cmd):
         if compret != 0:
             raise CkmsError(f"module compression failed for '{modf}'")
 
-    rdest = opt_destdir.resolve()
-    kdest = pathlib.Path("/lib/modules").resolve()
-
-    if opt_depmod and rdest == kdest:
-        dargs = ["-a"]
-        smap = pathlib.Path(f"/boot/System.map-{opt_kernver}")
-        if smap.is_file():
-            dargs += ["-F", smap]
-        if mod.do("depmod", *dargs, cwd = rdest).returncode != 0:
-            raise CkmsError(f"depmod failed for {opt_kernver}")
+    do_depmod()
 
     slinkp.symlink_to(slinkd)
 
@@ -478,6 +481,31 @@ def do_uninstall(cmd):
 
     if not kernpath.is_dir():
         raise CkmsError(f"kernel modules not found in '{kernpath}'")
+
+    mod = read_module(cmd[1], True)
+
+    kernhdrs = kern_path / opt_kernver / "build"
+
+    mod.ensure_builtins(kernhdrs, opt_arch, opt_kernver)
+
+    for modn, mpath, mdest, dostrip in mod.modules:
+        dpath = opt_destdir / opt_kernver / mdest
+        modf = f"{modn}.ko"
+        # clean up
+        dpath.mkdir(exist_ok = True, parents = True)
+        # remove modules, potentially compressed
+        for f in dpath.glob(f"{modn}.ko*"):
+            f.unlink()
+        # try removing empty
+        try:
+            while dpath.is_relative_to(opt_destdir):
+                os.rmdir(dpath)
+                dpath = dpath.parent
+        except OSError:
+            # stop at first non-empty
+            pass
+
+    do_depmod()
 
     log(f"uninstalled {mod.modver} for {opt_kernver}")
 
