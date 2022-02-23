@@ -21,6 +21,7 @@ opt_quiet = False
 opt_depmod = True
 opt_arch = None
 opt_jobs = None
+opt_comp = None
 
 use_colors = True
 
@@ -233,6 +234,27 @@ def do_clean(cmd):
 
     log(f"cleaned {mod.modver} for {opt_kernver}")
 
+def get_compsfx():
+    if opt_comp:
+        return f".{opt_comp}"
+    # figure out whether to compress modules
+    depf = kern_path / opt_kernver / "modules.dep"
+    compsfx = None
+    if depf:
+        with open(depf) as df:
+            for l in df:
+                if l.find(".ko.gz") > 0:
+                    compsfx = ".gz"
+                    break
+                if l.find(".ko.xz") > 0:
+                    compsfx = ".xz"
+                    break
+                if l.find(".ko.zst") > 0:
+                    compsfx = ".zst"
+                    break
+
+    return compsfx
+
 def do_build(cmd, quiet = False):
     check_has_action(cmd)
 
@@ -278,6 +300,8 @@ def do_build(cmd, quiet = False):
 
     log("registering...")
 
+    csfx = get_compsfx()
+
     for modn, mpath, mdest in mod.modules:
         log(f"registering kernel module '{modn}'")
         modf = bdir / mpath / f"{modn}.ko"
@@ -290,6 +314,16 @@ def do_build(cmd, quiet = False):
         destf.mkdir(parents = True, exist_ok = True)
         shutil.copy(modf, destf)
         (destf / f"{modn}.ko").chmod(0o644)
+        # compress
+        if csfx == ".gz":
+            mod.do("gzip", "-9f", destf / f"{modn}.ko")
+        elif csfx == ".xz":
+            mod.do("xz", "-f", destf / f"{modn}.ko")
+        elif csfx == ".zst":
+            mod.do(
+                "zstd", "-q", "-f", "-T0", "-20", "--ultra",
+                destf / f"{modn}.ko"
+            )
 
     # clean build dir
     shutil.rmtree(bdir)
@@ -321,14 +355,23 @@ def do_install(cmd):
 
     log(f"installing {mod.modver} for {opt_kernver}/{opt_arch}")
 
+    csfx = get_compsfx()
+
     for modn, mpath, mdest in mod.modules:
         spath = bpath / "module" / mpath
         dpath = opt_destdir / opt_kernver / mdest
-        modf = f"{modn}.ko"
+        if csfx == ".gz":
+            modf = f"{modn}.ko.gz"
+        elif csfx == ".xz":
+            modf = f"{modn}.ko.xz"
+        elif csfx == ".zst":
+            modf = f"{modn}.ko.zst"
         # clean up
         dpath.mkdir(exist_ok = True, parents = True)
         (dpath / modf).unlink(missing_ok = True)
-        # copy the file
+        # copy the file, validate just in case
+        if not spath / modf.exists():
+            raise CkmsError(f"module '{modf}' does not exist")
         shutil.copy(spath / modf, dpath)
 
     slinkp.symlink_to(slinkd)
@@ -350,7 +393,7 @@ def do_status(cmd):
 
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
-    global opt_depmod, opt_arch, opt_jobs
+    global opt_depmod, opt_arch, opt_jobs, opt_comp
     global use_colors
 
     parser = argparse.ArgumentParser(
@@ -368,6 +411,10 @@ def main():
     parser.add_argument(
         "-c", "--modconf", default = None,
         help = "Module config file to use (default: modpath/ckms.ini)",
+    )
+    parser.add_argument(
+        "-x", "--compression", default = None,
+        help = "Compression method for modules (gz, xz or zst)"
     )
     parser.add_argument(
         "-q", "--quiet", action = "store_const", const = True,
@@ -415,6 +462,9 @@ def main():
     if cmdline.jobs:
         opt_jobs = int(cmdline.jobs)
 
+    if cmdline.compression:
+        opt_comp = cmdline.compression
+
     # some reasonable defaults
 
     if not opt_jobs:
@@ -432,7 +482,17 @@ def main():
         use_colors = False
 
     if not opt_rootdir.is_dir():
-        raise CkmsError(f"state directory '{opt_rootdir}' does not exist")
+        log_red(f"ERROR: state directory '{opt_rootdir}' does not exist")
+        return 1
+
+    comps = {
+        "gz": True,
+        "xz": True,
+        "zst": True,
+    }
+    if opt_comp and opt_comp not in comps:
+        log_red(f"ERROR: invalid compression method {opt_comp}")
+        return 1
 
     # match the action
 

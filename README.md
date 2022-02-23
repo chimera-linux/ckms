@@ -28,7 +28,6 @@ TBD
 * More flexibility with the paths
 * Configurable stripping
 * Shell expression option for boolean metadata
-* Compressed modules
 * Module signing
 * More hooks
 * More validation/sanity checking
