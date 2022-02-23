@@ -84,7 +84,6 @@ have to `uninstall` them before doing so.
 
 * Configuration file reading
 * Fallback build helpers
-* More flexibility with the paths
 * Shell expression option for boolean metadata
 * Module signing
 * More hooks

@@ -512,7 +512,7 @@ def do_status(cmd):
 
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
-    global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_destdir
+    global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_rootdir, opt_destdir
     global use_colors
 
     parser = argparse.ArgumentParser(
@@ -546,6 +546,10 @@ def main():
     parser.add_argument(
         "-j", "--jobs", default = None,
         help = "Number of build jobs (default: number of CPUs)"
+    )
+    parser.add_argument(
+        "-s", "--statedir", default = None,
+        help = "The CKMS state directory (default: /var/lib/ckms)"
     )
     parser.add_argument(
         "-d", "--destdir", default = None,
@@ -584,6 +588,9 @@ def main():
 
     if cmdline.destdir:
         opt_destdir = pathlib.Path(cmdline.destdir)
+
+    if cmdline.statedir:
+        opt_rootdir = pathlib.Path(cmdline.statedir)
 
     if cmdline.jobs:
         opt_jobs = int(cmdline.jobs)
