@@ -150,14 +150,18 @@ class Module:
         self.env["CKMS_KERNEL"] = kernver
         self.env["CKMS_ARCH"] = kernarch
 
-    def shell(self, s):
+    def shell(self, s, cwd = None):
+        if not cwd:
+            cwd = self.modpath / "build"
         return subprocess.run(
-            s, shell = True, cwd = self.modpath / "build", env = self.env
+            s, shell = True, cwd = cwd, env = self.env
         )
 
-    def do(self, cmd, *args):
+    def do(self, cmd, *args, cwd = None):
+        if not cwd:
+            cwd = self.modpath / "build"
         return subprocess.run(
-            [cmd, *args], cwd = self.modpath / "build", env = self.env
+            [cmd, *args], cwd = cwd, env = self.env
         )
 
     def run_hook(self, hookn):
@@ -401,7 +405,7 @@ def do_install(cmd):
     csfx = get_compsfx()
 
     for modn, mpath, mdest, dostrip in mod.modules:
-        spath = bpath / "module" / mpath
+        spath = bpath / mpath
         dpath = opt_destdir / opt_kernver / mdest
         modf = f"{modn}.ko"
         # clean up
@@ -415,13 +419,13 @@ def do_install(cmd):
         shutil.copy(spath / modf, dpath)
         # compress
         if csfx == ".gz":
-            mod.do("gzip", "-9f", dpath / modf)
+            mod.do("gzip", "-9f", modf, cwd = dpath)
         elif csfx == ".xz":
-            mod.do("xz", "-f", dpath / modf)
+            mod.do("xz", "-f", modf, cwd = dpath)
         elif csfx == ".zst":
             mod.do(
                 "zstd", "-q", "-f", "-T0", "-20", "--ultra",
-                dpath / modf
+                modf, cwd = dpath
             )
 
     slinkp.symlink_to(slinkd)
@@ -488,7 +492,7 @@ def do_status(cmd):
 
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
-    global opt_depmod, opt_arch, opt_jobs, opt_comp
+    global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_destdir
     global use_colors
 
     parser = argparse.ArgumentParser(
@@ -524,6 +528,10 @@ def main():
         help = "Number of build jobs (default: number of CPUs)"
     )
     parser.add_argument(
+        "-d", "--destdir", default = None,
+        help = "Destination root to install modules to (default: /lib/modules)"
+    )
+    parser.add_argument(
         "-L", "--no-color", action = "store_const", const = True,
         default = False, help = "Force plain output."
     )
@@ -553,6 +561,9 @@ def main():
 
     if cmdline.no_depmod:
         opt_depmod = False
+
+    if cmdline.destdir:
+        opt_destdir = pathlib.Path(cmdline.destdir)
 
     if cmdline.jobs:
         opt_jobs = int(cmdline.jobs)
