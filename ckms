@@ -9,8 +9,10 @@ import traceback
 import subprocess
 import configparser
 
+kern_path = pathlib.Path("/lib/modules")
+
 opt_rootdir = pathlib.Path("/var/lib/ckms")
-opt_destdir = pathlib.Path("/lib/modules")
+opt_destdir = kern_path
 
 opt_confpath = "/etc/ckms.ini"
 opt_kernver = None
@@ -36,6 +38,16 @@ def log(msg, col = "\033[1m"):
 
 def log_red(msg):
     log(msg, "\033[1m\033[31m")
+
+def check_nonroot():
+    if os.geteuid() == 0:
+        raise CkmsError("please don't run this step as root")
+
+def check_has_action(cmd):
+    if len(cmd) < 2:
+        raise CkmsError("action argument not given")
+
+    check_nonroot()
 
 class Module:
     def __init__(self, name, version, modpath, modconf, cfgdata):
@@ -169,8 +181,7 @@ def read_module(modpath, by_name = False):
     return Module(gen["name"], gen["version"], modpath, modconf, mcfg)
 
 def do_add(cmd):
-    if len(cmd) < 2:
-        raise CkmsError("module path not given")
+    check_has_action(cmd)
 
     mod = read_module(cmd[1])
 
@@ -188,8 +199,7 @@ def do_add(cmd):
     log(f"added {mod.modver}")
 
 def do_remove(cmd):
-    if len(cmd) < 2:
-        raise CkmsError("module name/version not given")
+    check_has_action(cmd)
 
     mod = read_module(cmd[1], True)
 
@@ -214,8 +224,7 @@ def do_remove(cmd):
     log(f"removed {mod.modver}")
 
 def do_clean(cmd):
-    if len(cmd) < 2:
-        raise CkmsError("module name/version not given")
+    check_has_action(cmd)
 
     mod = read_module(cmd[1], True)
 
@@ -229,12 +238,11 @@ def do_clean(cmd):
     log(f"cleaned {mod.modver} for {opt_kernver}")
 
 def do_build(cmd, quiet = False):
-    if len(cmd) < 2:
-        raise CkmsError("module name/version not given")
+    check_has_action(cmd)
 
     mod = read_module(cmd[1], True)
 
-    kernhdrs = pathlib.Path("/lib/modules") / opt_kernver / "build"
+    kernhdrs = kern_path / opt_kernver / "build"
 
     if not kernhdrs.is_dir():
         raise CkmsError(f"kernel headers not installed in '{kernhdrs}'")
@@ -295,7 +303,20 @@ def do_build(cmd, quiet = False):
     return mod
 
 def do_install(cmd):
-    mod = do_build(cmd, True)
+    # can/often should run this one as root
+    # previous actions must be completed first
+    if len(cmd) < 2:
+        raise CkmsError("action argument not given")
+
+    mod = read_module(cmd[1], True)
+
+    kernhdrs = kern_path / opt_kernver / "build"
+
+    mod.ensure_builtins(kernhdrs, opt_arch, opt_kernver)
+
+    bpath = mod.modpath / opt_kernver / opt_arch
+    if not bpath.is_dir():
+        raise CkmsError(f"module {mod.modver} is not built")
 
     slinkn = f"kernel-{opt_kernver}-{opt_arch}"
     slinkd = f"{mod.version}/{opt_kernver}/{opt_arch}"
@@ -308,7 +329,7 @@ def do_install(cmd):
     log(f"installing {mod.modver} for {opt_kernver}/{opt_arch}")
 
     for modn, mpath, mdest in mod.modules:
-        spath = mod.modpath / opt_kernver / opt_arch / "module" / mpath
+        spath = bpath / "module" / mpath
         dpath = opt_destdir / opt_kernver / mdest
         modf = f"{modn}.ko"
         # clean up
@@ -325,7 +346,7 @@ def do_uninstall(cmd):
     if len(cmd) < 2:
         raise CkmsError("module name/version not given")
 
-    kernpath = pathlib.Path("/lib/modules") / opt_kernver
+    kernpath = opt_destdir / opt_kernver
 
     if not kernpath.is_dir():
         raise CkmsError(f"kernel modules not found in '{kernpath}'")

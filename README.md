@@ -21,7 +21,6 @@ TBD
 ## TODO
 
 * Logging system
-* Privilege separation
 * Status support
 * Configuration file reading
 * Fallback build helpers
