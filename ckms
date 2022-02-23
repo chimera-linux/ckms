@@ -254,11 +254,8 @@ def do_build(cmd, quiet = False):
     log("preparing build...")
 
     bdir = mod.modpath / "build"
-    # clean first if present
-    if bdir.is_dir():
-        shutil.rmtree(bdir)
-    # copy
-    shutil.copytree(mod.modpath / "source", mod.modpath / "build")
+    if not bdir.is_dir():
+        shutil.copytree(mod.modpath / "source", mod.modpath / "build")
 
     log("configuring...")
 
@@ -293,6 +290,9 @@ def do_build(cmd, quiet = False):
         destf.mkdir(parents = True, exist_ok = True)
         shutil.copy(modf, destf)
         (destf / f"{modn}.ko").chmod(0o644)
+
+    # clean build dir
+    shutil.rmtree(bdir)
 
     log(f"built {mod.modver} for {opt_kernver}/{opt_arch}")
 
