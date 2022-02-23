@@ -12,10 +12,11 @@ import configparser
 
 kern_path = pathlib.Path("/lib/modules")
 
-opt_rootdir = pathlib.Path("/var/lib/ckms")
-opt_destdir = kern_path
+# initial values, but after parsing cfg they will be pathlib.Path
+opt_rootdir = "/var/lib/ckms"
+opt_destdir = str(kern_path)
 
-opt_confpath = "/etc/ckms.ini"
+opt_confpath = "/etc/ckms/config.ini"
 opt_kernver = None
 opt_modconf = None
 opt_quiet = False
@@ -553,7 +554,7 @@ def main():
     )
     parser.add_argument(
         "-d", "--destdir", default = None,
-        help = "Destination root to install modules to (default: /lib/modules)"
+        help = f"Destination root for kernel modules (default: {opt_destdir})"
     )
     parser.add_argument(
         "-L", "--no-color", action = "store_const", const = True,
@@ -567,8 +568,14 @@ def main():
 
     cmdline = parser.parse_args()
 
-    gcfg = configparser.ConfigParser()
+    gcfg = configparser.ConfigParser(default_section = "ckms")
     gcfg.read(cmdline.config)
+
+    ckcfg = gcfg["ckms"]
+
+    opt_rootdir = pathlib.Path(ckcfg.get("statedir", fallback = opt_rootdir))
+    opt_destdir = pathlib.Path(ckcfg.get("destdir", fallback = opt_destdir))
+    opt_quiet = ckcfg.getboolean("quiet", fallback = False)
 
     # TODO read the cfg
 

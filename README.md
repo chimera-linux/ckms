@@ -82,7 +82,6 @@ have to `uninstall` them before doing so.
 
 ## TODO
 
-* Configuration file reading
 * Fallback build helpers
 * Shell expression option for boolean metadata
 * Module signing
