@@ -449,6 +449,17 @@ def do_install(cmd):
                 modf, cwd = dpath
             )
 
+    rdest = opt_destdir.resolve()
+    kdest = pathlib.Path("/lib/modules").resolve()
+
+    if opt_depmod and rdest == kdest:
+        dargs = ["-a"]
+        smap = pathlib.Path(f"/boot/System.map-{opt_kernver}")
+        if smap.is_file():
+            dargs += ["-F", smap]
+        if mod.do("depmod", *dargs, cwd = rdest).returncode != 0:
+            raise CkmsError(f"depmod failed for {opt_kernver}")
+
     slinkp.symlink_to(slinkd)
 
     log(f"installed {mod.modver} for {opt_kernver}/{opt_arch}")
