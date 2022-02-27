@@ -509,6 +509,10 @@ def do_uninstall(cmd):
             # stop at first non-empty
             pass
 
+    slinkn = f"kernel-{opt_kernver}-{opt_arch}"
+    slinkp = mod.modpath.parent / slinkn
+    slinkp.unlink(missing_ok = True)
+
     do_depmod()
 
     log(f"uninstalled {mod.modver} for {opt_kernver}")
