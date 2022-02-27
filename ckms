@@ -172,6 +172,36 @@ class Module:
         self.env["CKMS_KERNEL"] = kernver
         self.env["CKMS_ARCH"] = kernarch
 
+    def prepare_build_env(self):
+        cfg = kern_path / opt_kernver / "build/.config"
+        if not cfg.is_file():
+            self.env["CKMS_MAKE_ARGS"] = ""
+            return
+        margs = []
+        with open(cfg) as cf:
+            for l in cf:
+                # we only care about the first category
+                if l == "\n":
+                    break
+                if l == "CONFIG_CC_IS_CLANG=y":
+                    margs.append("LLVM=1")
+                    self.env["LLVM"] = "1"
+                elif l == "CONFIG_LD_IS_BFD=y":
+                    margs.append("LD=ld.bfd")
+                    self.env["LD"] = "ld.bfd"
+                elif l == "CONFIG_LD_IS_LLD=y":
+                    margs.append("LD=ld.lld")
+                    self.env["LD"] = "ld.lld"
+                elif l == "CONFIG_AS_IS_GNU=y":
+                    margs.append("LLVM_IAS=0")
+                    self.env["LLVM_IAS"] = "0"
+        # ensure LLVM_IAS is set to something
+        if "LLVM_IAS" not in self.env and "LLVM" in self.env:
+            margs.append("LLVM_IAS=1")
+            self.env["LLVM_IAS"] = "1"
+        # expose extra make args
+        self.env["CKMS_MAKE_ARGS"] = " ".join(margs)
+
     def shell(self, s, cwd = None):
         if not cwd:
             cwd = self.modpath / "build"
@@ -354,6 +384,7 @@ def do_build(cmd, quiet = False):
         raise CkmsError(f"kernel headers not installed in '{kernhdrs}'")
 
     mod.ensure_builtins(kernhdrs, opt_arch, opt_kernver)
+    mod.prepare_build_env()
 
     bpath = mod.modpath / opt_kernver / opt_arch
     if bpath.is_dir():
