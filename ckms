@@ -414,7 +414,7 @@ def do_build(cmd, quiet = False):
 
     return mod
 
-def do_depmod():
+def do_depmod(mod):
     rdest = opt_destdir.resolve()
     kdest = pathlib.Path("/lib/modules").resolve()
 
@@ -480,7 +480,7 @@ def do_install(cmd):
         if compret != 0:
             raise CkmsError(f"module compression failed for '{modf}'")
 
-    do_depmod()
+    do_depmod(mod)
 
     slinkp.symlink_to(slinkd)
 
@@ -520,7 +520,7 @@ def do_uninstall(cmd):
     slinkp = mod.modpath.parent / slinkn
     slinkp.unlink(missing_ok = True)
 
-    do_depmod()
+    do_depmod(mod)
 
     log(f"uninstalled {mod.modver} for {opt_kernver}")
 
