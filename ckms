@@ -271,6 +271,9 @@ def do_add(cmd):
     dbpath = opt_rootdir / mod.name / mod.version
     slpath = dbpath / "source"
     dbpath.mkdir(parents = True, exist_ok = True)
+    # ensure it's not already added
+    if slpath.is_dir() or (dbpath / "ckms.ini").is_file():
+        raise CkmsError(f"{mod.modver} is already added")
     # create source symlink
     if slpath.exists() and not slpath.is_symlink():
         raise CkmsError(f"'{slpath}' exists but is not a symlink")
