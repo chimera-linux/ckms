@@ -41,6 +41,12 @@ by the full path. You can build it:
 $ ckms build foo=1.0
 ```
 
+It is still possible to refer to it by path too, this time in the database, e.g.
+
+```
+$ ckms build /var/lib/ckms/foo/1.0
+```
+
 That will build the module for the current kernel. If you want to build it
 for another kernel, use the `-k` or `--kernver` parameter. The `ckms.ini`
 is installed into the state directory with `add`, so you no longer have to

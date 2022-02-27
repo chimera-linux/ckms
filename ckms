@@ -205,6 +205,10 @@ def get_modpath(namever):
     eq = namever.find("=")
 
     if eq < 0:
+        p = pathlib.Path(namever)
+        if p.is_dir() and p.parent.parent == opt_rootdir:
+            if (p / "source").is_dir():
+                return p
         raise CkmsError(f"'{namever}' does not match format 'name=version'")
 
     name = namever[0:eq]
