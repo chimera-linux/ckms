@@ -423,7 +423,7 @@ def do_depmod(mod):
         smap = pathlib.Path(f"/boot/System.map-{opt_kernver}")
         if smap.is_file():
             dargs += ["-F", smap]
-        if mod.do("depmod", *dargs, cwd = rdest).returncode != 0:
+        if mod.do("depmod", *dargs, opt_kernver, cwd = rdest).returncode != 0:
             raise CkmsError(f"depmod failed for {opt_kernver}")
 
 def do_install(cmd):
