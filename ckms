@@ -200,6 +200,7 @@ class Module:
                 # we only care about the first category
                 if l == "\n":
                     break
+                l = l.strip()
                 if l == "CONFIG_CC_IS_CLANG=y":
                     margs.append("LLVM=1")
                     self.env["LLVM"] = "1"
