@@ -42,9 +42,10 @@ $ ckms build foo=1.0
 ```
 
 That will build the module for the current kernel. If you want to build it
-for another kernel, use the `-k` or `--kernver` parameter. This assumes that
-`ckms.ini` for the module exists within the source directory too; if it does
-not, you still need to pass the path via `-c` or `--modconf`.
+for another kernel, use the `-k` or `--kernver` parameter. The `ckms.ini`
+is installed into the state directory with `add`, so you no longer have to
+worry about it. You can still specify `-c` or `--modconf` manually if you
+wish to override it for some reason.
 
 Once built, you can install it similarly, with
 

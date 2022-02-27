@@ -226,7 +226,10 @@ def read_module(modpath, by_name = False):
 
     modconf = opt_modconf
     if not modconf:
-        modconf = modpath / "ckms.ini"
+        if by_name:
+            modconf = modpath.parent / "ckms.ini"
+        else:
+            modconf = modpath / "ckms.ini"
 
     modconf = pathlib.Path(modconf)
 
@@ -268,6 +271,8 @@ def do_add(cmd):
     if slpath.exists() and not slpath.is_symlink():
         raise CkmsError(f"'{slpath}' exists but is not a symlink")
     slpath.symlink_to(mod.modpath)
+    # install ckms.ini
+    shutil.copy(mod.modconf, dbpath)
 
     log(f"added {mod.modver}")
 
@@ -575,7 +580,7 @@ def main():
     )
     parser.add_argument(
         "-c", "--modconf", default = None,
-        help = "Module config file to use (default: modpath/ckms.ini)",
+        help = "Module config file to use (default: use stored)",
     )
     parser.add_argument(
         "-x", "--compression", default = None,
