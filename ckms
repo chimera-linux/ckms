@@ -18,6 +18,8 @@ opt_destdir = str(kern_path)
 
 opt_confpath = "/etc/ckms/config.ini"
 opt_stripbin = "strip"
+opt_makeargs = ""
+opt_makeenv = None
 opt_kernver = None
 opt_modconf = None
 opt_quiet = False
@@ -172,12 +174,27 @@ class Module:
         self.env["CKMS_KERNEL"] = kernver
         self.env["CKMS_ARCH"] = kernarch
 
+    def add_cfg_env(self):
+        # add extra make args first
+        margs = opt_makeargs.strip()
+        if len(margs) > 0:
+            oargs = self.env["CKMS_MAKE_ARGS"]
+            if len(oargs) > 0:
+                self.env["CKMS_MAKE_ARGS"] = oargs + " " + margs
+            else:
+                self.env["CKMS_MAKE_ARGS"]= margs
+        # then add custom environment
+        if opt_makeenv:
+            for optn, optv in opt_makeenv.items():
+                self.env[optn] = optv
+
     def prepare_build_env(self):
         cfg = kern_path / opt_kernver / "build/.config"
-        if not cfg.is_file():
-            self.env["CKMS_MAKE_ARGS"] = ""
-            return
         margs = []
+        if not cfg.is_file():
+            self.env["CKMS_MAKE_ARGS"] = " ".join(margs)
+            self.add_cfg_env()
+            return
         with open(cfg) as cf:
             for l in cf:
                 # we only care about the first category
@@ -201,6 +218,8 @@ class Module:
             self.env["LLVM_IAS"] = "1"
         # expose extra make args
         self.env["CKMS_MAKE_ARGS"] = " ".join(margs)
+        # add stuff from global config
+        self.add_cfg_env()
 
     def shell(self, s, cwd = None):
         if not cwd:
@@ -606,7 +625,7 @@ def do_status(cmd):
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
     global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_rootdir, opt_destdir
-    global use_colors, opt_stripbin
+    global use_colors, opt_stripbin, opt_makeargs, opt_makeenv
 
     parser = argparse.ArgumentParser(
         description = "Chimera Kernel Module System"
@@ -669,6 +688,9 @@ def main():
     opt_destdir = pathlib.Path(ckcfg.get("destdir", fallback = opt_destdir))
     opt_quiet = ckcfg.getboolean("quiet", fallback = False)
     opt_stripbin = ckcfg.get("strip", fallback = opt_stripbin)
+    opt_makeargs = ckcfg.get("make_build_args", fallback = opt_makeargs)
+    if "build_env" in gcfg:
+        opt_makeenv = gcfg["build_env"]
 
     # TODO read the cfg
 
