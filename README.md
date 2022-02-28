@@ -70,9 +70,9 @@ inverse of `install`, i.e. `uninstall`.
 If you run non-`install` (or `uninstall`) steps as `root`, CKMS will drop
 privileges to the owner of `/var/lib/ckms`.
 
-Once installed, the modules are ready to be used. CKMS will never regenerate
-your `initramfs` or perform anything other than `depmod` (which can still be
-overridden). It is up to you to do so.
+Once installed, the modules are ready to be used. CKMS will run `depmod` if
+the modules are installed in a real kernel, and will refresh your `initramfs`
+if the module requires it and if there is an appropriate hook in place.
 
 Unlike DKMS, CKMS is primarily designed to be integrated into package managers
 of distributions and avoids including any features that would overlap with

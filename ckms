@@ -487,6 +487,9 @@ def do_depmod(mod):
             dargs += ["-F", smap]
         if mod.do("depmod", *dargs, opt_kernver, cwd = rdest).returncode != 0:
             raise CkmsError(f"depmod failed for {opt_kernver}")
+        return True
+
+    return False
 
 def do_initramfs(mod):
     if not mod.initramfs:
@@ -555,7 +558,8 @@ def do_install(cmd):
         if compret != 0:
             raise CkmsError(f"module compression failed for '{modf}'")
 
-    do_depmod(mod)
+    if do_depmod(mod):
+        do_initramfs(mod)
 
     slinkp.symlink_to(slinkd)
 
@@ -595,7 +599,8 @@ def do_uninstall(cmd):
     slinkp = mod.modpath.parent / slinkn
     slinkp.unlink(missing_ok = True)
 
-    do_depmod(mod)
+    if do_depmod(mod):
+        do_initramfs(mod)
 
     log(f"uninstalled {mod.modver} for {opt_kernver}")
 
