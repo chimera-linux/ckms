@@ -240,7 +240,7 @@ class Module:
             s, shell = True, cwd = cwd, env = self.env
         )
 
-    def do(self, cmd, *args, cwd = None. env = None):
+    def do(self, cmd, *args, cwd = None, env = None):
         if not cwd:
             cwd = self.modpath / "build"
         if not env:
