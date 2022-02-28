@@ -17,6 +17,7 @@ opt_rootdir = "/var/lib/ckms"
 opt_destdir = str(kern_path)
 
 opt_confpath = "/etc/ckms/config.ini"
+opt_initramfs = "/etc/ckms/refresh-initramfs.sh"
 opt_stripbin = "strip"
 opt_makeargs = ""
 opt_makeenv = None
@@ -104,10 +105,20 @@ class Module:
         self.cfgdata = cfgdata
         self.modpath = modpath
         self.modconf = modconf
+        # whether to strip the modules, true by default
         try:
-            self.strip = cfgdata["general"].getboolean("strip", fallback = True)
+            self.strip = cfgdata["general"].getboolean(
+                "strip", fallback = True
+            )
         except ValueError:
             raise CkmsError("invalid value for 'strip'")
+        # whether the modules are in initramfs, false by default
+        try:
+            self.initramfs = cfgdata["general"].getboolean(
+                "initramfs", fallback = False
+            )
+        except ValueError:
+            raise CkmsError("invalid value for 'initramfs'")
         # determine make implementation, default to gnu make
         maken = cfgdata["general"].get("make", fallback = "gmake")
         if not shutil.which(maken):
@@ -229,12 +240,12 @@ class Module:
             s, shell = True, cwd = cwd, env = self.env
         )
 
-    def do(self, cmd, *args, cwd = None):
+    def do(self, cmd, *args, cwd = None. env = None):
         if not cwd:
             cwd = self.modpath / "build"
-        return subprocess.run(
-            [cmd, *args], cwd = cwd, env = self.env
-        )
+        if not env:
+            env = self.env
+        return subprocess.run([cmd, *args], cwd = cwd, env = env)
 
     def run_hook(self, hookn):
         if "hooks" not in self.cfgdata:
@@ -477,6 +488,19 @@ def do_depmod(mod):
         if mod.do("depmod", *dargs, opt_kernver, cwd = rdest).returncode != 0:
             raise CkmsError(f"depmod failed for {opt_kernver}")
 
+def do_initramfs(mod):
+    if not mod.initramfs:
+        return
+
+    rdest = opt_destdir.resolve()
+
+    if pathlib.Path(opt_initramfs).is_file():
+        if mod.do(
+            opt_initramfs, opt_kernver, cwd = rdest, env = dict(os.environ)
+        ).returncode != 0:
+            log_red(f"ERROR: failed to update initramfs for {opt_kernver}")
+            log("You might have to refresh it manually.")
+
 def do_install(cmd):
     check_has_action(cmd, False)
 
@@ -626,7 +650,7 @@ def do_status(cmd):
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
     global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_rootdir, opt_destdir
-    global use_colors, opt_stripbin, opt_makeargs, opt_makeenv
+    global use_colors, opt_stripbin, opt_makeargs, opt_makeenv, opt_initramfs
 
     parser = argparse.ArgumentParser(
         description = "Chimera Kernel Module System"
@@ -690,6 +714,7 @@ def main():
     opt_quiet = ckcfg.getboolean("quiet", fallback = False)
     opt_stripbin = ckcfg.get("strip", fallback = opt_stripbin)
     opt_makeargs = ckcfg.get("make_build_args", fallback = opt_makeargs)
+    opt_initramfs = ckcfg.get("initramfs_hook", fallback = opt_initramfs)
     if "build_env" in gcfg:
         opt_makeenv = gcfg["build_env"]
 
