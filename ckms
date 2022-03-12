@@ -287,19 +287,21 @@ def read_module(modpath, by_name = False):
         modpath = pathlib.Path(modpath)
 
     if not modpath.is_dir():
-        raise CkmsError(f"module path '{cmd[1]}' does not exist")
+        raise CkmsError(f"module path '{modpath}' does not exist")
+
+    if by_name:
+        rmodpath = modpath.parent
+    else:
+        rmodpath = modpath
 
     modconf = opt_modconf
     if not modconf:
-        if by_name:
-            modconf = modpath.parent / "ckms.ini"
-        else:
-            modconf = modpath / "ckms.ini"
+        modconf = rmodpath / "ckms.ini"
 
     modconf = pathlib.Path(modconf)
 
     if not modconf.is_file():
-        raise CkmsError(f"module config file not found for '{cmd[1]}'")
+        raise CkmsError(f"module config file not found for '{rmodpath}'")
 
     mcfg = configparser.ConfigParser(default_section = "general")
     mcfg.read(modconf)
@@ -317,11 +319,7 @@ def read_module(modpath, by_name = False):
     gen["ckms_rootdir"] = str(opt_rootdir)
     gen["ckms_destdir"] = str(opt_destdir)
 
-    # when not registering, we want modpath not to point to the source
-    if by_name:
-        modpath = modpath.parent
-
-    return Module(gen["name"], gen["version"], modpath, modconf, mcfg)
+    return Module(gen["name"], gen["version"], rmodpath, modconf, mcfg)
 
 def do_add(cmd):
     check_has_action(cmd)
