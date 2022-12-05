@@ -268,8 +268,7 @@ def get_modpath(namever):
     if eq < 0:
         p = pathlib.Path(namever)
         if p.is_dir() and p.parent.parent == opt_rootdir:
-            if (p / "source").is_dir():
-                return p
+            return p
         raise CkmsError(f"'{namever}' does not match format 'name=version'")
 
     name = namever[0:eq]
@@ -280,28 +279,26 @@ def get_modpath(namever):
 
     return opt_rootdir / name / ver
 
-def read_module(modpath, by_name = False):
+def read_module(modpath, by_name = False, check_source = True):
     if by_name:
-        modpath = get_modpath(modpath) / "source"
+        modpath = get_modpath(modpath)
     else:
         modpath = pathlib.Path(modpath)
 
     if not modpath.is_dir():
         raise CkmsError(f"module path '{modpath}' does not exist")
 
-    if by_name:
-        rmodpath = modpath.parent
-    else:
-        rmodpath = modpath
+    if check_source and by_name and not (modpath / "source").is_dir():
+        raise CkmsError(f"module source in '{modpath}' does not exist")
 
     modconf = opt_modconf
     if not modconf:
-        modconf = rmodpath / "ckms.ini"
+        modconf = modpath / "ckms.ini"
 
     modconf = pathlib.Path(modconf)
 
     if not modconf.is_file():
-        raise CkmsError(f"module config file not found for '{rmodpath}'")
+        raise CkmsError(f"module config file not found for '{modpath}'")
 
     mcfg = configparser.ConfigParser(default_section = "general")
     mcfg.read(modconf)
@@ -319,7 +316,7 @@ def read_module(modpath, by_name = False):
     gen["ckms_rootdir"] = str(opt_rootdir)
     gen["ckms_destdir"] = str(opt_destdir)
 
-    return Module(gen["name"], gen["version"], rmodpath, modconf, mcfg)
+    return Module(gen["name"], gen["version"], modpath, modconf, mcfg)
 
 def do_add(cmd):
     check_has_action(cmd)
@@ -345,7 +342,7 @@ def do_add(cmd):
 def do_remove(cmd):
     check_has_action(cmd)
 
-    mod = read_module(cmd[1], True)
+    mod = read_module(cmd[1], True, False)
 
     can_rm = True
 
@@ -370,7 +367,7 @@ def do_remove(cmd):
 def do_clean(cmd):
     check_has_action(cmd)
 
-    mod = read_module(cmd[1], True)
+    mod = read_module(cmd[1], True, False)
 
     kpath = mod.modpath / opt_kernver
 
@@ -571,7 +568,7 @@ def do_uninstall(cmd):
     if not kernpath.is_dir():
         raise CkmsError(f"kernel modules not found in '{kernpath}'")
 
-    mod = read_module(cmd[1], True)
+    mod = read_module(cmd[1], True, False)
 
     kernhdrs = kern_path / opt_kernver / "build"
 
