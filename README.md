@@ -22,6 +22,7 @@ their metadata. They can have three states:
 * added (registered with CKMS)
 * built (done building but not installed yet)
 * installed
+* disabled
 
 Each state is for a specific kernel version, except `added`, which is global.
 
@@ -52,6 +53,19 @@ for another kernel, use the `-k` or `--kernver` parameter. The `ckms.ini`
 is installed into the state directory with `add`, so you no longer have to
 worry about it. You can still specify `-c` or `--modconf` manually if you
 wish to override it for some reason.
+
+It is possible to disable a module for a specific kernel version. This is done
+by creating a file named the same as the kernel version in the `ckms-disable`
+directory within the source tree of the module. If this is done, `ckms` will
+not allow you to build the module, and it will show as `disabled` in `status`.
+
+If disabled after it is built, it will show as `built+disabled` in `status`
+and it will not be installable. If disabled after it is installed, it will
+still show as `installed` in `status` and you will be able to uninstall it.
+You will be able to `clean` it if built, regardless of installed status.
+
+This functionality can be used e.g. by package managers to prevent CKMS from
+building modules that are managed through packaged binaries for specific kernels.
 
 Once built, you can install it similarly, with
 

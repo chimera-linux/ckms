@@ -288,8 +288,14 @@ def read_module(modpath, by_name = False, check_source = True):
     if not modpath.is_dir():
         raise CkmsError(f"module path '{modpath}' does not exist")
 
-    if check_source and by_name and not (modpath / "source").is_dir():
-        raise CkmsError(f"module source in '{modpath}' does not exist")
+    if check_source and by_name:
+        srcp = modpath / "source"
+        if not srcp.is_dir():
+            raise CkmsError(f"module source in '{modpath}' does not exist")
+        if (srcp / "ckms-disable" / opt_kernver).is_file():
+            raise CkmsError(
+                f"module in '{modpath}' disabled for kernel '{opt_kernver}'"
+            )
 
     modconf = opt_modconf
     if not modconf:
@@ -633,9 +639,6 @@ def do_status(cmd, pretty = True):
             # specfic module version was given
             if modver and version != modver:
                 continue
-            # broken; ignore
-            if not (v / "source").is_dir():
-                continue
             # baseline state
             state = "added"
             if (v / opt_kernver / opt_arch).is_dir():
@@ -644,6 +647,16 @@ def do_status(cmd, pretty = True):
                 # check if it's installed too
                 if (f / f"kernel-{opt_kernver}-{opt_arch}").is_symlink():
                     state = "installed"
+            elif not (v / "source").is_dir():
+                # if not built and source does not exist, exclude from status
+                continue
+            # handle disabled modules
+            if (v / "source/ckms-disable" / opt_kernver).is_file():
+                if state == "added":
+                    state = "disabled"
+                elif state == "built":
+                    # special case
+                    state = f"built+disabled"
             # print whatever state we got
             if pretty:
                 print(f"{modname}, {version}, {opt_kernver}, {opt_arch}: {state}")
