@@ -599,7 +599,7 @@ def do_uninstall(cmd):
 
     log(f"uninstalled {mod.modver} for {opt_kernver}")
 
-def do_status(cmd):
+def do_status(cmd, pretty = True):
     if len(cmd) < 2:
         module = None
     else:
@@ -645,7 +645,10 @@ def do_status(cmd):
                 if (f / f"kernel-{opt_kernver}-{opt_arch}").is_symlink():
                     state = "installed"
             # print whatever state we got
-            print(f"{modname}, {version}, {opt_kernver}, {opt_arch}: {state}")
+            if pretty:
+                print(f"{modname}, {version}, {opt_kernver}, {opt_arch}: {state}")
+            else:
+                print(f"{modname} {version} {opt_kernver} {opt_arch} {state}")
 
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
@@ -800,6 +803,9 @@ def main():
         elif action == "status":
             # print a module status for the given kernel
             do_status(cmdline.command)
+        elif action == "plain-status":
+            # like status, but shell-parseable
+            do_status(cmdline.command, False)
         else:
             sys.stderr.write(
                 f"Unknown action given: {cmdline.command[0]}\n"
