@@ -572,9 +572,6 @@ def do_uninstall(cmd):
 
     kernpath = opt_destdir / opt_kernver
 
-    if not kernpath.is_dir():
-        raise CkmsError(f"kernel modules not found in '{kernpath}'")
-
     mod = read_module(cmd[1], True, False)
 
     kernhdrs = kern_path / opt_kernver / "build"
@@ -582,7 +579,7 @@ def do_uninstall(cmd):
     mod.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
 
     for modn, mpath, mdest, dostrip in mod.modules:
-        dpath = opt_destdir / opt_kernver / mdest
+        dpath = kernpath / mdest
         if not dpath.is_dir():
             continue
         # remove modules, potentially compressed
