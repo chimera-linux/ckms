@@ -263,10 +263,19 @@ class Module:
             )
         return True
 
-def get_modpath(namever):
+def get_modpath(namever, guess_ver):
     eq = namever.find("=")
 
     if eq < 0:
+        if guess_ver and namever.find("/") < 0:
+            gp = opt_statedir / namever / f"kernel-{opt_kernver}-{opt_machine}"
+            if gp.is_symlink():
+                # go down to version
+                gp = gp.resolve().parent.parent
+                if gp.parent.name == namever:
+                    # we've resolved it
+                    namever = gp
+        # follow the regular logic from here
         p = pathlib.Path(namever)
         if p.is_dir() and p.parent.parent == opt_statedir:
             return p
@@ -280,9 +289,9 @@ def get_modpath(namever):
 
     return opt_statedir / name / ver
 
-def read_module(modpath, by_name = False, check_source = True):
+def read_module(modpath, by_name = False, check_source = True, guess_ver = False):
     if by_name:
-        modpath = get_modpath(modpath)
+        modpath = get_modpath(modpath, guess_ver)
     else:
         modpath = pathlib.Path(modpath)
 
@@ -572,7 +581,7 @@ def do_uninstall(cmd):
 
     kernpath = opt_destdir / opt_kernver
 
-    mod = read_module(cmd[1], True, False)
+    mod = read_module(cmd[1], True, False, True)
 
     kernhdrs = kern_path / opt_kernver / "build"
 

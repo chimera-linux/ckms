@@ -126,9 +126,11 @@ _zfs=2.0.5_) or its path in CKMS database (e.g. _/var/lib/ckms/zfs/2.0.5_).
 	are needed in the initramfs. Handling initramfs refresh requires a custom
 	user-supplied hook script, whose path can be set in the global config file.
 
-*uninstall* _PACKAGE_
+*uninstall* _PACKAGE_OR_NAME_
 	Uninstall a package for the given kernel. Similarly to installation, the
-	_depmod_ command may be invoked, and initramfs may be refreshed.
+	_depmod_ command may be invoked, and initramfs may be refreshed. You do
+	not have to specify the version here, as CKMS can guess the installed
+	version from just the name.
 
 *status* [_PACKAGE_]
 	Display the current status for either the given package or all packages,
@@ -229,9 +231,9 @@ To install it after building:
 
 	ckms -k 4.20.69\_1 install zfs=2.0.5
 
-To get rid of it:
+To get rid of it (version is optional here):
 
-	ckms -k 4.20.69\_1 uninstall zfs=2.0.5
+	ckms -k 4.20.69\_1 uninstall zfs
 
 To clean built artifacts of it:
 
