@@ -121,7 +121,7 @@ can be referenced from other fields using the standard interpolation.
 *kernel\_hdrdir*
 	The path to kernel headers for the given kernel.
 
-*kernel\_arch*
+*kernel\_machine*
 	The kernel architecture, i.e. _uname -m_.
 
 *kernel\_version*
@@ -163,10 +163,10 @@ needs to be used with care.
 *CKMS\_KERNEL\_HDRDIR*
 	The path to kernel headers for the given kernel.
 
-*CKMS\_KERNEL*
+*CKMS\_KERNEL\_VERSION*
 	The kernel version.
 
-*CKMS\_ARCH*
+*CKMS\_KERNEL\_MACHINE*
 	The kernel architecture, i.e. _uname -m_.
 
 *CKMS\_MAKE\_ARGS*
@@ -176,7 +176,7 @@ needs to be used with care.
 
 *LLVM*
 	This is set to 1 if a kernel config file is located and the system
-	infers that it was built with Clang.
+	infers that it was built with Clang. Otherwise, it will be unset.
 
 *LLVM\_IAS*
 	If a kernel config file is located and the system infers that GNU assembler

@@ -25,7 +25,7 @@ opt_kernver = None
 opt_modconf = None
 opt_quiet = False
 opt_depmod = True
-opt_arch = None
+opt_machine = None
 opt_jobs = None
 opt_comp = None
 
@@ -175,15 +175,15 @@ class Module:
         if len(self.modules) == 0:
             raise CkmsError(f"'{self.name}' has no kernel modules")
 
-    def ensure_builtins(self, kerndir, kernarch, kernver):
+    def ensure_builtins(self, kerndir, kernmach, kernver):
         gen = self.cfgdata["general"]
         gen["kernel_hdrdir"] = str(kerndir)
-        gen["kernel_arch"] = kernarch
+        gen["kernel_machine"] = kernmach
         gen["kernel_version"] = kernver
         # expose for hooks
         self.env["CKMS_KERNEL_HDRDIR"] = str(kerndir)
-        self.env["CKMS_KERNEL"] = kernver
-        self.env["CKMS_ARCH"] = kernarch
+        self.env["CKMS_KERNEL_VERSION"] = kernver
+        self.env["CKMS_KERNEL_MACHINE"] = kernmach
 
     def add_cfg_env(self):
         # add extra make args first
@@ -415,10 +415,10 @@ def do_build(cmd, quiet = False):
     if not kernhdrs.is_dir():
         raise CkmsError(f"kernel headers not installed in '{kernhdrs}'")
 
-    mod.ensure_builtins(kernhdrs, opt_arch, opt_kernver)
+    mod.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
     mod.prepare_build_env()
 
-    bpath = mod.modpath / opt_kernver / opt_arch
+    bpath = mod.modpath / opt_kernver / opt_machine
     if bpath.is_dir():
         if not quiet:
             log(f"found built tree for {mod.modver}")
@@ -473,7 +473,7 @@ def do_build(cmd, quiet = False):
     if (mod.modpath / "logs").is_dir():
         shutil.move(mod.modpath / "logs", bpath)
 
-    log(f"built {mod.modver} for {opt_kernver}/{opt_arch}")
+    log(f"built {mod.modver} for {opt_kernver}/{opt_machine}")
 
     return mod
 
@@ -512,21 +512,21 @@ def do_install(cmd):
 
     kernhdrs = kern_path / opt_kernver / "build"
 
-    mod.ensure_builtins(kernhdrs, opt_arch, opt_kernver)
+    mod.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
 
-    bpath = mod.modpath / opt_kernver / opt_arch
+    bpath = mod.modpath / opt_kernver / opt_machine
     if not bpath.is_dir():
         raise CkmsError(f"module {mod.modver} is not built")
 
-    slinkn = f"kernel-{opt_kernver}-{opt_arch}"
-    slinkd = f"{mod.version}/{opt_kernver}/{opt_arch}"
+    slinkn = f"kernel-{opt_kernver}-{opt_machine}"
+    slinkd = f"{mod.version}/{opt_kernver}/{opt_machine}"
     slinkp = mod.modpath.parent / slinkn
 
     if slinkp.is_symlink():
         log(f"'{mod.modver}' already installed for {opt_kernver}")
         return
 
-    log(f"installing {mod.modver} for {opt_kernver}/{opt_arch}")
+    log(f"installing {mod.modver} for {opt_kernver}/{opt_machine}")
 
     csfx = get_compsfx()
 
@@ -564,7 +564,7 @@ def do_install(cmd):
 
     slinkp.symlink_to(slinkd)
 
-    log(f"installed {mod.modver} for {opt_kernver}/{opt_arch}")
+    log(f"installed {mod.modver} for {opt_kernver}/{opt_machine}")
 
 def do_uninstall(cmd):
     check_has_action(cmd, False)
@@ -578,7 +578,7 @@ def do_uninstall(cmd):
 
     kernhdrs = kern_path / opt_kernver / "build"
 
-    mod.ensure_builtins(kernhdrs, opt_arch, opt_kernver)
+    mod.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
 
     for modn, mpath, mdest, dostrip in mod.modules:
         dpath = opt_destdir / opt_kernver / mdest
@@ -596,7 +596,7 @@ def do_uninstall(cmd):
             # stop at first non-empty
             pass
 
-    slinkn = f"kernel-{opt_kernver}-{opt_arch}"
+    slinkn = f"kernel-{opt_kernver}-{opt_machine}"
     slinkp = mod.modpath.parent / slinkn
     slinkp.unlink(missing_ok = True)
 
@@ -641,11 +641,11 @@ def do_status(cmd, pretty = True):
                 continue
             # baseline state
             state = "added"
-            if (v / opt_kernver / opt_arch).is_dir():
+            if (v / opt_kernver / opt_machine).is_dir():
                 # built or better
                 state = "built"
                 # check if it's installed too
-                if (f / f"kernel-{opt_kernver}-{opt_arch}").is_symlink():
+                if (f / f"kernel-{opt_kernver}-{opt_machine}").is_symlink():
                     state = "installed"
             elif not (v / "source").is_dir():
                 # if not built and source does not exist, exclude from status
@@ -659,13 +659,13 @@ def do_status(cmd, pretty = True):
                     state = f"built+disabled"
             # print whatever state we got
             if pretty:
-                print(f"{modname}, {version}, {opt_kernver}, {opt_arch}: {state}")
+                print(f"{modname}, {version}, {opt_kernver}, {opt_machine}: {state}")
             else:
-                print(f"{modname} {version} {opt_kernver} {opt_arch} {state}")
+                print(f"{modname} {version} {opt_kernver} {opt_machine} {state}")
 
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
-    global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_statedir, opt_destdir
+    global opt_depmod, opt_machine, opt_jobs, opt_comp, opt_statedir, opt_destdir
     global use_colors, opt_stripbin, opt_makeargs, opt_makeenv, opt_initramfs
 
     parser = argparse.ArgumentParser(
@@ -772,8 +772,8 @@ def main():
     if not opt_kernver:
         opt_kernver = os.uname().release
 
-    if not opt_arch:
-        opt_arch = os.uname().machine
+    if not opt_machine:
+        opt_machine = os.uname().machine
 
     if "NO_COLOR" in os.environ or not sys.stdout.isatty() or cmdline.no_color:
         use_colors = False
