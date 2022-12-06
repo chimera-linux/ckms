@@ -211,3 +211,7 @@ These arguments are currently constructed.
 
 *LD=ld.lld*
 	Added if the LLD linker was used for the kernel.
+
+# SEE ALSO
+
+*ckms-config.ini*(5), *ckms*(8)
