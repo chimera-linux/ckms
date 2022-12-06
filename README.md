@@ -1,5 +1,7 @@
 # Chimera Kernel Module System
 
+*Version 0.1.0*
+
 This is a lightweight alternative to DKMS (https://github.com/dell/dkms).
 As DKMS is full of cruft and is essentially a massive bash script, I felt
 a change was needed. In general CKMS works more or less the same, and has
