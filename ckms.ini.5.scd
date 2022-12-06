@@ -81,7 +81,7 @@ as well unless the invocation is quiet.
 	Run before the actual build.
 
 *build*
-	This is the mandatory hook that will build the module.
+	This is the mandatory hook that will build the module(s).
 
 *post\_build*
 	Run after the build.
@@ -142,10 +142,10 @@ needs to be used with care.
 *SHELL*
 	This is always _/bin/sh_.
 
-*CKMS\_MODNAME*
+*CKMS\_PACKAGE\_NAME*
 	The package name from the metadata.
 
-*CKMS\_MODVERSION*
+*CKMS\_PACKAGE\_VERSION*
 	The package version from the metadata.
 
 *CKMS\_JOBS*
