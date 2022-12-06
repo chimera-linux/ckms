@@ -23,7 +23,7 @@ opt_stripcmd = "strip -g"
 opt_makeargs = ""
 opt_makeenv = None
 opt_kernver = None
-opt_modconf = None
+opt_pkgconf = None
 opt_quiet = False
 opt_depmod = True
 opt_machine = None
@@ -98,14 +98,14 @@ def check_has_action(cmd, drop_priv = True):
     if drop_priv:
         drop_privs()
 
-class Module:
-    def __init__(self, name, version, modpath, modconf, cfgdata):
+class Package:
+    def __init__(self, name, version, pkgpath, pkgconf, cfgdata):
         self.name = name
         self.version = version
-        self.modver = f"{name}={version}"
+        self.pkgver = f"{name}={version}"
         self.cfgdata = cfgdata
-        self.modpath = modpath
-        self.modconf = modconf
+        self.pkgpath = pkgpath
+        self.pkgconf = pkgconf
         # whether to strip the modules, true by default
         try:
             self.strip = cfgdata["general"].getboolean(
@@ -236,14 +236,14 @@ class Module:
 
     def shell(self, s, cwd = None):
         if not cwd:
-            cwd = self.modpath / "build"
+            cwd = self.pkgpath / "build"
         return subprocess.run(
             s, shell = True, cwd = cwd, env = self.env
         )
 
     def do(self, cmd, *args, cwd = None, env = None):
         if not cwd:
-            cwd = self.modpath / "build"
+            cwd = self.pkgpath / "build"
         if not env:
             env = self.env
         return subprocess.run([cmd, *args], cwd = cwd, env = env)
@@ -253,9 +253,9 @@ class Module:
             return False
         if hookn not in self.cfgdata["hooks"]:
             return False
-        (self.modpath / "logs").mkdir(exist_ok = True, parents = True)
+        (self.pkgpath / "logs").mkdir(exist_ok = True, parents = True)
         # redirect output into logfile as necessary
-        with redir_allout(self.modpath / f"logs/{hookn}.log"):
+        with redir_allout(self.pkgpath / f"logs/{hookn}.log"):
             pret = self.shell(self.cfgdata["hooks"][hookn])
         if pret.returncode != 0:
             raise CkmsError(
@@ -263,7 +263,7 @@ class Module:
             )
         return True
 
-def get_modpath(namever, guess_ver):
+def get_pkgpath(namever, guess_ver):
     eq = namever.find("=")
 
     if eq < 0:
@@ -289,110 +289,110 @@ def get_modpath(namever, guess_ver):
 
     return opt_statedir / name / ver
 
-def read_module(modpath, by_name = False, check_source = True, guess_ver = False):
+def read_package(pkgpath, by_name = False, check_source = True, guess_ver = False):
     if by_name:
-        modpath = get_modpath(modpath, guess_ver)
+        pkgpath = get_pkgpath(pkgpath, guess_ver)
     else:
-        modpath = pathlib.Path(modpath)
+        pkgpath = pathlib.Path(pkgpath)
 
-    if not modpath.is_dir():
-        raise CkmsError(f"module path '{modpath}' does not exist")
+    if not pkgpath.is_dir():
+        raise CkmsError(f"package path '{pkgpath}' does not exist")
 
     if check_source and by_name:
-        srcp = modpath / "source"
+        srcp = pkgpath / "source"
         if not srcp.is_dir():
-            raise CkmsError(f"module source in '{modpath}' does not exist")
+            raise CkmsError(f"package source in '{pkgpath}' does not exist")
         if (srcp / "ckms-disable" / opt_kernver).is_file():
             raise CkmsError(
-                f"module in '{modpath}' disabled for kernel '{opt_kernver}'"
+                f"package in '{pkgpath}' disabled for kernel '{opt_kernver}'"
             )
 
-    modconf = opt_modconf
-    if not modconf:
-        modconf = modpath / "ckms.ini"
+    pkgconf = opt_pkgconf
+    if not pkgconf:
+        pkgconf = pkgpath / "ckms.ini"
 
-    modconf = pathlib.Path(modconf)
+    pkgconf = pathlib.Path(pkgconf)
 
-    if not modconf.is_file():
-        raise CkmsError(f"module config file not found for '{modpath}'")
+    if not pkgconf.is_file():
+        raise CkmsError(f"package config file not found for '{pkgpath}'")
 
     mcfg = configparser.ConfigParser(default_section = "general")
-    mcfg.read(modconf)
+    mcfg.read(pkgconf)
 
     if "general" not in mcfg:
-        raise CkmsError(f"general section missing for '{modconf}'")
+        raise CkmsError(f"general section missing for '{pkgconf}'")
 
     gen = mcfg["general"]
 
     if "name" not in gen:
-        raise CkmsError(f"module name unknown for '{modconf}'")
+        raise CkmsError(f"package name unknown for '{pkgconf}'")
     if "version" not in gen:
-        raise CkmsError(f"module version unknown for '{modconf}'")
+        raise CkmsError(f"package version unknown for '{pkgconf}'")
 
     gen["ckms_statedir"] = str(opt_statedir)
     gen["ckms_destdir"] = str(opt_destdir)
 
-    return Module(gen["name"], gen["version"], modpath, modconf, mcfg)
+    return Package(gen["name"], gen["version"], pkgpath, pkgconf, mcfg)
 
 def do_add(cmd):
     check_has_action(cmd)
 
-    mod = read_module(cmd[1])
+    pkg = read_package(cmd[1])
 
-    # create module directory
-    dbpath = opt_statedir / mod.name / mod.version
+    # create package directory
+    dbpath = opt_statedir / pkg.name / pkg.version
     slpath = dbpath / "source"
     dbpath.mkdir(parents = True, exist_ok = True)
     # ensure it's not already added
     if slpath.is_dir() or (dbpath / "ckms.ini").is_file():
-        raise CkmsError(f"{mod.modver} is already added")
+        raise CkmsError(f"{pkg.pkgver} is already added")
     # create source symlink
     if slpath.exists() and not slpath.is_symlink():
         raise CkmsError(f"'{slpath}' exists but is not a symlink")
-    slpath.symlink_to(mod.modpath)
+    slpath.symlink_to(pkg.pkgpath)
     # install ckms.ini
-    shutil.copy(mod.modconf, dbpath)
+    shutil.copy(pkg.pkgconf, dbpath)
 
-    log(f"added {mod.modver}")
+    log(f"added {pkg.pkgver}")
 
 def do_remove(cmd):
     check_has_action(cmd)
 
-    mod = read_module(cmd[1], True, False)
+    pkg = read_package(cmd[1], True, False)
 
     can_rm = True
 
-    for f in mod.modpath.iterdir():
+    for f in pkg.pkgpath.iterdir():
         if f.name == "source" or f.name == "build":
             continue
         log(f"{cmd[1]} still built for '{f.name}'")
         can_rm = False
 
     if not can_rm:
-        raise CkmsError(f"'{mod.modpath}' has built modules")
+        raise CkmsError(f"'{pkg.pkgpath}' has built modules")
 
-    (mod.modpath / "source").unlink(missing_ok = True)
+    (pkg.pkgpath / "source").unlink(missing_ok = True)
 
-    if (mod.modpath / "build").is_dir():
-        shutil.rmtree(mod.modpath / "build")
+    if (pkg.pkgpath / "build").is_dir():
+        shutil.rmtree(pkg.pkgpath / "build")
 
-    mod.modpath.rmdir()
+    pkg.pkgpath.rmdir()
 
-    log(f"removed {mod.modver}")
+    log(f"removed {pkg.pkgver}")
 
 def do_clean(cmd):
     check_has_action(cmd)
 
-    mod = read_module(cmd[1], True, False)
+    pkg = read_package(cmd[1], True, False)
 
-    kpath = mod.modpath / opt_kernver
+    kpath = pkg.pkgpath / opt_kernver
 
     if not kpath.is_dir():
-        raise CkmsError(f"{mod.modver} not built for {opt_kernver}")
+        raise CkmsError(f"{pkg.pkgver} not built for {opt_kernver}")
 
     shutil.rmtree(kpath)
 
-    log(f"cleaned {mod.modver} for {opt_kernver}")
+    log(f"cleaned {pkg.pkgver} for {opt_kernver}")
 
 def get_compsfx():
     if opt_comp:
@@ -418,37 +418,37 @@ def get_compsfx():
 def do_build(cmd, quiet = False):
     check_has_action(cmd)
 
-    mod = read_module(cmd[1], True)
+    pkg = read_package(cmd[1], True)
 
     kernhdrs = kern_path / opt_kernver / "build"
 
     if not kernhdrs.is_dir():
         raise CkmsError(f"kernel headers not installed in '{kernhdrs}'")
 
-    mod.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
-    mod.prepare_build_env()
+    pkg.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
+    pkg.prepare_build_env()
 
-    bpath = mod.modpath / opt_kernver / opt_machine
+    bpath = pkg.pkgpath / opt_kernver / opt_machine
     if bpath.is_dir():
         if not quiet:
-            log(f"found built tree for {mod.modver}")
-        return mod
+            log(f"found built tree for {pkg.pkgver}")
+        return
 
     log("preparing build...")
 
-    bdir = mod.modpath / "build"
+    bdir = pkg.pkgpath / "build"
     if not bdir.is_dir():
-        shutil.copytree(mod.modpath / "source", mod.modpath / "build")
+        shutil.copytree(pkg.pkgpath / "source", pkg.pkgpath / "build")
 
     log("configuring...")
 
-    mod.run_hook("configure")
+    pkg.run_hook("configure")
 
     log("building...")
 
-    mod.run_hook("pre_build")
+    pkg.run_hook("pre_build")
 
-    if not mod.run_hook("build"):
+    if not pkg.run_hook("build"):
         # default behavior
         raise CkmsError("default build hook not yet supported")
 
@@ -457,19 +457,19 @@ def do_build(cmd, quiet = False):
         shutil.rmtree(mdestb)
     mdestb.mkdir(parents = True, exist_ok = True)
 
-    mod.run_hook("post_build")
+    pkg.run_hook("post_build")
 
     log("registering...")
 
-    for modn, mpath, mdest, dostrip in mod.modules:
+    for modn, mpath, mdest, dostrip in pkg.modules:
         log(f"registering kernel module '{modn}'")
         modf = bdir / mpath / f"{modn}.ko"
         destf = bpath / mpath
         if not modf.is_file():
             raise CkmsError(f"kernel module '{modn}' does not exist")
         # strip first
-        if dostrip or (mod.strip and dostrip != False):
-            if mod.do(*shlex.split(opt_stripcmd), modf).returncode != 0:
+        if dostrip or (pkg.strip and dostrip != False):
+            if pkg.do(*shlex.split(opt_stripcmd), modf).returncode != 0:
                 raise CkmsError(f"strip failed for '{modf}'")
         # then copy
         destf.mkdir(parents = True, exist_ok = True)
@@ -480,14 +480,12 @@ def do_build(cmd, quiet = False):
     shutil.rmtree(bdir)
 
     # move logs dir into kernel-specific dir
-    if (mod.modpath / "logs").is_dir():
-        shutil.move(mod.modpath / "logs", bpath)
+    if (pkg.pkgpath / "logs").is_dir():
+        shutil.move(pkg.pkgpath / "logs", bpath)
 
-    log(f"built {mod.modver} for {opt_kernver}/{opt_machine}")
+    log(f"built {pkg.pkgver} for {opt_kernver}/{opt_machine}")
 
-    return mod
-
-def do_depmod(mod):
+def do_depmod(pkg):
     rdest = opt_destdir.resolve()
     kdest = pathlib.Path("/lib/modules").resolve()
 
@@ -496,20 +494,20 @@ def do_depmod(mod):
         smap = pathlib.Path(f"/boot/System.map-{opt_kernver}")
         if smap.is_file():
             dargs += ["-F", smap]
-        if mod.do("depmod", *dargs, opt_kernver, cwd = rdest).returncode != 0:
+        if pkg.do("depmod", *dargs, opt_kernver, cwd = rdest).returncode != 0:
             raise CkmsError(f"depmod failed for {opt_kernver}")
         return True
 
     return False
 
-def do_initramfs(mod):
-    if not mod.initramfs:
+def do_initramfs(pkg):
+    if not pkg.initramfs:
         return
 
     rdest = opt_destdir.resolve()
 
     if pathlib.Path(opt_initramfs).is_file():
-        if mod.do(
+        if pkg.do(
             opt_initramfs, opt_kernver, cwd = rdest, env = dict(os.environ)
         ).returncode != 0:
             log_red(f"ERROR: failed to update initramfs for {opt_kernver}")
@@ -518,29 +516,29 @@ def do_initramfs(mod):
 def do_install(cmd):
     check_has_action(cmd, False)
 
-    mod = read_module(cmd[1], True)
+    pkg = read_package(cmd[1], True)
 
     kernhdrs = kern_path / opt_kernver / "build"
 
-    mod.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
+    pkg.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
 
-    bpath = mod.modpath / opt_kernver / opt_machine
+    bpath = pkg.pkgpath / opt_kernver / opt_machine
     if not bpath.is_dir():
-        raise CkmsError(f"module {mod.modver} is not built")
+        raise CkmsError(f"package {pkg.pkgver} is not built")
 
     slinkn = f"kernel-{opt_kernver}-{opt_machine}"
-    slinkd = f"{mod.version}/{opt_kernver}/{opt_machine}"
-    slinkp = mod.modpath.parent / slinkn
+    slinkd = f"{pkg.version}/{opt_kernver}/{opt_machine}"
+    slinkp = pkg.pkgpath.parent / slinkn
 
     if slinkp.is_symlink():
-        log(f"'{mod.modver}' already installed for {opt_kernver}")
+        log(f"'{pkg.pkgver}' already installed for {opt_kernver}")
         return
 
-    log(f"installing {mod.modver} for {opt_kernver}/{opt_machine}")
+    log(f"installing {pkg.pkgver} for {opt_kernver}/{opt_machine}")
 
     csfx = get_compsfx()
 
-    for modn, mpath, mdest, dostrip in mod.modules:
+    for modn, mpath, mdest, dostrip in pkg.modules:
         spath = bpath / mpath
         dpath = opt_destdir / opt_kernver / mdest
         modf = f"{modn}.ko"
@@ -555,11 +553,11 @@ def do_install(cmd):
         shutil.copy(spath / modf, dpath)
         # compress
         if csfx == ".gz":
-            compret = mod.do("gzip", "-9f", modf, cwd = dpath).returncode
+            compret = pkg.do("gzip", "-9f", modf, cwd = dpath).returncode
         elif csfx == ".xz":
-            compret = mod.do("xz", "-f", modf, cwd = dpath).returncode
+            compret = pkg.do("xz", "-f", modf, cwd = dpath).returncode
         elif csfx == ".zst":
-            compret = mod.do(
+            compret = pkg.do(
                 "zstd", "-q", "-f", "-T0", "-20", "--ultra",
                 modf, cwd = dpath
             ).returncode
@@ -569,25 +567,25 @@ def do_install(cmd):
         if compret != 0:
             raise CkmsError(f"module compression failed for '{modf}'")
 
-    if do_depmod(mod):
-        do_initramfs(mod)
+    if do_depmod(pkg):
+        do_initramfs(pkg)
 
     slinkp.symlink_to(slinkd)
 
-    log(f"installed {mod.modver} for {opt_kernver}/{opt_machine}")
+    log(f"installed {pkg.pkgver} for {opt_kernver}/{opt_machine}")
 
 def do_uninstall(cmd):
     check_has_action(cmd, False)
 
     kernpath = opt_destdir / opt_kernver
 
-    mod = read_module(cmd[1], True, False, True)
+    pkg = read_package(cmd[1], True, False, True)
 
     kernhdrs = kern_path / opt_kernver / "build"
 
-    mod.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
+    pkg.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
 
-    for modn, mpath, mdest, dostrip in mod.modules:
+    for modn, mpath, mdest, dostrip in pkg.modules:
         dpath = kernpath / mdest
         if not dpath.is_dir():
             continue
@@ -604,28 +602,28 @@ def do_uninstall(cmd):
             pass
 
     slinkn = f"kernel-{opt_kernver}-{opt_machine}"
-    slinkp = mod.modpath.parent / slinkn
+    slinkp = pkg.pkgpath.parent / slinkn
     slinkp.unlink(missing_ok = True)
 
     # only do this if the kernel still exists
-    if (kernpath / "modules.dep").is_file() and do_depmod(mod):
-        do_initramfs(mod)
+    if (kernpath / "modules.dep").is_file() and do_depmod(pkg):
+        do_initramfs(pkg)
 
-    log(f"uninstalled {mod.modver} for {opt_kernver}")
+    log(f"uninstalled {pkg.pkgver} for {opt_kernver}")
 
 def do_status(cmd, pretty = True):
     if len(cmd) < 2:
-        module = None
+        package = None
     else:
-        module = cmd[1]
+        package = cmd[1]
 
-    modver = None
+    pkgver = None
 
-    if module:
-        eq = module.find("=")
+    if package:
+        eq = package.find("=")
         if eq > 0:
-            modver = module[eq + 1:]
-            module = module[0:eq]
+            pkgver = package[eq + 1:]
+            package = package[0:eq]
 
     # just in case
     drop_privs()
@@ -634,9 +632,9 @@ def do_status(cmd, pretty = True):
         # just skip over junk
         if not f.is_dir():
             continue
-        modname = f.name
-        # specific module was given
-        if module and modname != module:
+        pkgname = f.name
+        # specific package was given
+        if package and pkgname != package:
             continue
         # otherwise loop for versions
         for v in f.iterdir():
@@ -644,8 +642,8 @@ def do_status(cmd, pretty = True):
             if not v.is_dir():
                 continue
             version = v.name
-            # specfic module version was given
-            if modver and version != modver:
+            # specfic package version was given
+            if pkgver and version != pkgver:
                 continue
             # baseline state
             state = "added"
@@ -658,7 +656,7 @@ def do_status(cmd, pretty = True):
             elif not (v / "source").is_dir():
                 # if not built and source does not exist, exclude from status
                 continue
-            # handle disabled modules
+            # handle disabled packages
             if (v / "source/ckms-disable" / opt_kernver).is_file():
                 if state == "added":
                     state = "disabled"
@@ -667,12 +665,12 @@ def do_status(cmd, pretty = True):
                     state = f"built+disabled"
             # print whatever state we got
             if pretty:
-                print(f"{modname}, {version}, {opt_kernver}, {opt_machine}: {state}")
+                print(f"{pkgname}, {version}, {opt_kernver}, {opt_machine}: {state}")
             else:
-                print(f"{modname} {version} {opt_kernver} {opt_machine} {state}")
+                print(f"{pkgname} {version} {opt_kernver} {opt_machine} {state}")
 
 def main():
-    global opt_confpath, opt_kernver, opt_modconf, opt_quiet
+    global opt_confpath, opt_kernver, opt_pkgconf, opt_quiet
     global opt_depmod, opt_machine, opt_jobs, opt_comp, opt_statedir, opt_destdir
     global use_colors, opt_stripcmd, opt_makeargs, opt_makeenv, opt_initramfs
 
@@ -689,8 +687,8 @@ def main():
         help = "Kernel version to use (default: current kernel)."
     )
     parser.add_argument(
-        "-c", "--modconf", default = None,
-        help = "Module config file to use (default: use stored)",
+        "-c", "--pkgconf", default = None,
+        help = "Package config file to use (default: use stored)",
     )
     parser.add_argument(
         "-x", "--compression", default = None,
@@ -749,8 +747,8 @@ def main():
     if cmdline.kernver:
         opt_kernver = cmdline.kernver
 
-    if cmdline.modconf:
-        opt_modconf = cmdline.modconf
+    if cmdline.pkgconf:
+        opt_pkgconf = cmdline.pkgconf
 
     if cmdline.quiet:
         opt_quiet = True
@@ -804,25 +802,25 @@ def main():
     try:
         action = cmdline.command[0]
         if action == "add":
-            # add a module into the system
+            # add a package into the system
             do_add(cmdline.command)
         elif action == "remove":
-            # remove a module from the system
+            # remove a package from the system
             do_remove(cmdline.command)
         elif action == "install":
-            # install a module for the given kernel
+            # install a package for the given kernel
             do_install(cmdline.command)
         elif action == "uninstall":
-            # uninstall a module from the given kernel
+            # uninstall a package from the given kernel
             do_uninstall(cmdline.command)
         elif action == "build":
-            # build a module for the given kernel
+            # build a package for the given kernel
             do_build(cmdline.command)
         elif action == "clean":
-            # clean a module build for the given kernel
+            # clean a package build for the given kernel
             do_clean(cmdline.command)
         elif action == "status":
-            # print a module status for the given kernel
+            # print a package status for the given kernel
             do_status(cmdline.command)
         elif action == "plain-status":
             # like status, but shell-parseable

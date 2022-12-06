@@ -54,7 +54,7 @@ the commands.
 	default). This configuration file has its own manual page
 	*ckms-config.ini*(5).
 
-*-c, --modconf* _MODCONFIG_
+*-c, --pkgconf* _PKGCONFIG_
 	Override the module package config file when adding. This is rarely
 	necessary, except when you are adding a kernel module source tree that
 	does not supply a _ckms.ini_, and you are supplying it externally. By
