@@ -132,9 +132,11 @@ _zfs=2.0.5_) or its path in CKMS database (e.g. _/var/lib/ckms/zfs/2.0.5_).
 	not have to specify the version here, as CKMS can guess the installed
 	version from just the name.
 
-*status* [_PACKAGE_]
+*status* [_NAME_]
 	Display the current status for either the given package or all packages,
-	for the given kernel.
+	for the given kernel. If specifying a package, either specify just the
+	name (which will display the status for all available versions) or
+	specify only the version you want (which will filter the results).
 
 	The status has the format _name, version, kernver, arch: state_, where
 	the name is the package name, the version is its version, the kernver
