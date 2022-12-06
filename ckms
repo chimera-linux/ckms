@@ -601,7 +601,8 @@ def do_uninstall(cmd):
     slinkp = mod.modpath.parent / slinkn
     slinkp.unlink(missing_ok = True)
 
-    if do_depmod(mod):
+    # only do this if the kernel still exists
+    if (kernpath / "modules.dep").is_file() and do_depmod(mod):
         do_initramfs(mod)
 
     log(f"uninstalled {mod.modver} for {opt_kernver}")
