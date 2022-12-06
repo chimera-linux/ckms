@@ -34,7 +34,7 @@ This is everything in the section _[ckms]_.
 	Whether to not print build output to stdout. The default is to print it.
 
 *strip* _(string)_
-	The strip binary to use for modules. The default is just _strip_.
+	The strip command to use for modules. The default is _strip -g_.
 
 *initramfs\_hook* _(path)_
 	Path to the executable that is invoked to refresh initramfs for a kernel.

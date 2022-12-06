@@ -2,6 +2,7 @@
 
 import os
 import sys
+import shlex
 import shutil
 import pathlib
 import argparse
@@ -18,7 +19,7 @@ opt_destdir = str(kern_path)
 
 opt_confpath = "/etc/ckms/config.ini"
 opt_initramfs = "/etc/ckms/refresh-initramfs.sh"
-opt_stripbin = "strip"
+opt_stripcmd = "strip -g"
 opt_makeargs = ""
 opt_makeenv = None
 opt_kernver = None
@@ -459,7 +460,7 @@ def do_build(cmd, quiet = False):
             raise CkmsError(f"kernel module '{modn}' does not exist")
         # strip first
         if dostrip or (mod.strip and dostrip != False):
-            if mod.do(opt_stripbin, "-g", modf).returncode != 0:
+            if mod.do(*shlex.split(opt_stripcmd), modf).returncode != 0:
                 raise CkmsError(f"strip failed for '{modf}'")
         # then copy
         destf.mkdir(parents = True, exist_ok = True)
@@ -666,7 +667,7 @@ def do_status(cmd, pretty = True):
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
     global opt_depmod, opt_machine, opt_jobs, opt_comp, opt_statedir, opt_destdir
-    global use_colors, opt_stripbin, opt_makeargs, opt_makeenv, opt_initramfs
+    global use_colors, opt_stripcmd, opt_makeargs, opt_makeenv, opt_initramfs
 
     parser = argparse.ArgumentParser(
         description = "Chimera Kernel Module System"
@@ -728,7 +729,7 @@ def main():
     opt_statedir = pathlib.Path(ckcfg.get("statedir", fallback = opt_statedir))
     opt_destdir = pathlib.Path(ckcfg.get("destdir", fallback = opt_destdir))
     opt_quiet = ckcfg.getboolean("quiet", fallback = False)
-    opt_stripbin = ckcfg.get("strip", fallback = opt_stripbin)
+    opt_stripcmd = ckcfg.get("strip", fallback = opt_stripcmd)
     opt_makeargs = ckcfg.get("make_build_args", fallback = opt_makeargs)
     opt_initramfs = ckcfg.get("initramfs_hook", fallback = opt_initramfs)
     if "build_env" in gcfg:
