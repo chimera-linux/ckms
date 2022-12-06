@@ -112,7 +112,7 @@ extension.
 The general section has some implicit fields that are set by CKMS, and those
 can be referenced from other fields using the standard interpolation.
 
-*ckms\_rootdir*
+*ckms\_statedir*
 	The state directory of CKMS (i.e. _/var/lib/ckms_).
 
 *ckms\_destdir*
@@ -151,7 +151,7 @@ needs to be used with care.
 *CKMS\_JOBS*
 	The number of build jobs to use.
 
-*CKMS\_ROOTDIR*
+*CKMS\_STATEDIR*
 	The state directory of CKMS (i.e. _/var/lib/ckms_).
 
 *CKMS\_DESTDIR*

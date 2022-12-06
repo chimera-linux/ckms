@@ -13,7 +13,7 @@ import configparser
 kern_path = pathlib.Path("/lib/modules")
 
 # initial values, but after parsing cfg they will be pathlib.Path
-opt_rootdir = "/var/lib/ckms"
+opt_statedir = "/var/lib/ckms"
 opt_destdir = str(kern_path)
 
 opt_confpath = "/etc/ckms/config.ini"
@@ -86,7 +86,7 @@ def drop_privs():
     if os.geteuid() != 0:
         return
     # drop privileges to owner of state directory
-    st = opt_rootdir.stat()
+    st = opt_statedir.stat()
     os.setgid(st.st_gid)
     os.setuid(st.st_uid)
 
@@ -145,7 +145,7 @@ class Module:
             "CKMS_PACKAGE_NAME": name,
             "CKMS_PACKAGE_VERSION": version,
             "CKMS_JOBS": str(opt_jobs),
-            "CKMS_ROOTDIR": str(opt_rootdir),
+            "CKMS_STATEDIR": str(opt_statedir),
             "CKMS_DESTDIR": str(opt_destdir),
         }
         if opt_depmod:
@@ -267,7 +267,7 @@ def get_modpath(namever):
 
     if eq < 0:
         p = pathlib.Path(namever)
-        if p.is_dir() and p.parent.parent == opt_rootdir:
+        if p.is_dir() and p.parent.parent == opt_statedir:
             return p
         raise CkmsError(f"'{namever}' does not match format 'name=version'")
 
@@ -277,7 +277,7 @@ def get_modpath(namever):
     if len(name) == 0 or len(ver) == 0:
         raise CkmsError(f"'{namever}' does not match format 'name=version'")
 
-    return opt_rootdir / name / ver
+    return opt_statedir / name / ver
 
 def read_module(modpath, by_name = False, check_source = True):
     if by_name:
@@ -319,7 +319,7 @@ def read_module(modpath, by_name = False, check_source = True):
     if "version" not in gen:
         raise CkmsError(f"module version unknown for '{modconf}'")
 
-    gen["ckms_rootdir"] = str(opt_rootdir)
+    gen["ckms_statedir"] = str(opt_statedir)
     gen["ckms_destdir"] = str(opt_destdir)
 
     return Module(gen["name"], gen["version"], modpath, modconf, mcfg)
@@ -330,7 +330,7 @@ def do_add(cmd):
     mod = read_module(cmd[1])
 
     # create module directory
-    dbpath = opt_rootdir / mod.name / mod.version
+    dbpath = opt_statedir / mod.name / mod.version
     slpath = dbpath / "source"
     dbpath.mkdir(parents = True, exist_ok = True)
     # ensure it's not already added
@@ -622,7 +622,7 @@ def do_status(cmd, pretty = True):
     # just in case
     drop_privs()
 
-    for f in opt_rootdir.iterdir():
+    for f in opt_statedir.iterdir():
         # just skip over junk
         if not f.is_dir():
             continue
@@ -665,7 +665,7 @@ def do_status(cmd, pretty = True):
 
 def main():
     global opt_confpath, opt_kernver, opt_modconf, opt_quiet
-    global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_rootdir, opt_destdir
+    global opt_depmod, opt_arch, opt_jobs, opt_comp, opt_statedir, opt_destdir
     global use_colors, opt_stripbin, opt_makeargs, opt_makeenv, opt_initramfs
 
     parser = argparse.ArgumentParser(
@@ -725,7 +725,7 @@ def main():
 
     ckcfg = gcfg["ckms"]
 
-    opt_rootdir = pathlib.Path(ckcfg.get("statedir", fallback = opt_rootdir))
+    opt_statedir = pathlib.Path(ckcfg.get("statedir", fallback = opt_statedir))
     opt_destdir = pathlib.Path(ckcfg.get("destdir", fallback = opt_destdir))
     opt_quiet = ckcfg.getboolean("quiet", fallback = False)
     opt_stripbin = ckcfg.get("strip", fallback = opt_stripbin)
@@ -754,7 +754,7 @@ def main():
         opt_destdir = pathlib.Path(cmdline.destdir)
 
     if cmdline.statedir:
-        opt_rootdir = pathlib.Path(cmdline.statedir)
+        opt_statedir = pathlib.Path(cmdline.statedir)
 
     if cmdline.jobs:
         opt_jobs = int(cmdline.jobs)
@@ -778,8 +778,8 @@ def main():
     if "NO_COLOR" in os.environ or not sys.stdout.isatty() or cmdline.no_color:
         use_colors = False
 
-    if not opt_rootdir.is_dir():
-        log_red(f"ERROR: state directory '{opt_rootdir}' does not exist")
+    if not opt_statedir.is_dir():
+        log_red(f"ERROR: state directory '{opt_statedir}' does not exist")
         return 1
 
     comps = {
