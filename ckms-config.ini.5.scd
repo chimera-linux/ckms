@@ -36,7 +36,7 @@ This is everything in the section _[ckms]_.
 *strip* _(string)_
 	The strip binary to use for modules. The default is just _strip_.
 
-*initramfs_hook* _(path)_
+*initramfs\_hook* _(path)_
 	Path to the executable that is invoked to refresh initramfs for a kernel.
 	This can be a shell script and must be supplied by the distribution, as
 	it is specific to the initramfs generator and so on.
@@ -50,7 +50,7 @@ This is everything in the section _[ckms]_.
 
 	The default is _/etc/ckms/refresh-initramfs.sh_.
 
-*make_build_args*
+*make\_build\_args*
 	Additional arguments to be provided in _CKMS\_MAKE\_ARGS_ in the build
 	environment of a package. They are always added to the very end, after
 	any arguments implicitly set up by CKMS.
