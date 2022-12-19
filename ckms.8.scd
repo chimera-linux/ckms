@@ -170,9 +170,10 @@ The following states are recognized and valid.
 	from being built. This is mostly useful when a kernel is managing specific
 	modules on its own, and CKMS would only get in the way.
 
-	A package can be disabled for a kernel by creating a file with the same
-	name as the kernel version in the _ckms-disable_ directory located inside
-	the package's source tree.
+	A package can be disabled for a kernel by creating a file called the same
+	as the package version in a directory called the same as the package name
+	inside the _ckms-disable_ directory located inside the module directory,
+	for example _/lib/modules/4.20.69-0-generic/ckms-disable/zfs/2.0.5_.
 
 *built+disabled*
 	This is the state the package will have when it has been built for the

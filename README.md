@@ -56,10 +56,11 @@ is installed into the state directory with `add`, so you no longer have to
 worry about it. You can still specify `-c` or `--modconf` manually if you
 wish to override it for some reason.
 
-It is possible to disable a module for a specific kernel version. This is done
-by creating a file named the same as the kernel version in the `ckms-disable`
-directory within the source tree of the module. If this is done, `ckms` will
-not allow you to build the module, and it will show as `disabled` in `status`.
+It is possible to disable a module for a specific kernel version. A module is
+disabled if the `ckms-disable` directory exists in the kernel module directory,
+containing `packagename`, it itself containing `packageversion`. If this is done,
+`ckms` will not allow you to build the module, and it will show as `disabled` in
+`status`.
 
 If disabled after it is built, it will show as `built+disabled` in `status`
 and it will not be installable. If disabled after it is installed, it will

@@ -302,10 +302,6 @@ def read_package(pkgpath, by_name = False, check_source = True, guess_ver = Fals
         srcp = pkgpath / "source"
         if not srcp.is_dir():
             raise CkmsError(f"package source in '{pkgpath}' does not exist")
-        if (srcp / "ckms-disable" / opt_kernver).is_file():
-            raise CkmsError(
-                f"package in '{pkgpath}' disabled for kernel '{opt_kernver}'"
-            )
 
     pkgconf = opt_pkgconf
     if not pkgconf:
@@ -332,7 +328,17 @@ def read_package(pkgpath, by_name = False, check_source = True, guess_ver = Fals
     gen["ckms_statedir"] = str(opt_statedir)
     gen["ckms_destdir"] = str(opt_destdir)
 
-    return Package(gen["name"], gen["version"], pkgpath, pkgconf, mcfg)
+    pnm = gen["name"]
+    pvr = gen["version"]
+
+    if check_source and by_name:
+        cdp = kern_path / opt_kernver / "ckms-disable"
+        if (cdp / pnm / pvr).is_file():
+            raise CkmsError(
+                f"package '{pnm}={pvr}' disabled for kernel '{opt_kernver}'"
+            )
+
+    return Package(pnm, pvr, pkgpath, pkgconf, mcfg)
 
 def do_add(cmd):
     check_has_action(cmd)
@@ -657,7 +663,8 @@ def do_status(cmd, pretty = True):
                 # if not built and source does not exist, exclude from status
                 continue
             # handle disabled packages
-            if (v / "source/ckms-disable" / opt_kernver).is_file():
+            cdp = kern_path / opt_kernver / "ckms-disable"
+            if (cdp / pkgname / version).is_file():
                 if state == "added":
                     state = "disabled"
                 elif state == "built":
