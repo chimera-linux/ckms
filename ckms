@@ -99,18 +99,6 @@ def check_has_action(cmd, drop_priv = True):
     if drop_priv:
         drop_privs()
 
-_mach_exact = {
-    "alpha": True,
-    "arc": True,
-    "hexagon": True,
-    "ia64": True,
-    "m68k": True,
-    "microblaze": True,
-    "nios2": True,
-    "openrisc": True,
-    "xtensa": True,
-}
-
 # determine the linux kernel architecture from uname machine
 def machine_to_arch(mach):
     if mach.startswith("aarch64"):
