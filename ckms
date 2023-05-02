@@ -4,6 +4,7 @@ import os
 import sys
 import shlex
 import shutil
+import fnmatch
 import pathlib
 import argparse
 import traceback
@@ -98,6 +99,45 @@ def check_has_action(cmd, drop_priv = True):
     if drop_priv:
         drop_privs()
 
+_mach_exact = {
+    "alpha": True,
+    "arc": True,
+    "hexagon": True,
+    "ia64": True,
+    "m68k": True,
+    "microblaze": True,
+    "nios2": True,
+    "openrisc": True,
+    "xtensa": True,
+}
+
+# determine the linux kernel architecture from uname machine
+def machine_to_arch(mach):
+    if mach.startswith("aarch64"):
+        return "arm64"
+    elif mach.startswith("arm"):
+        return "arm"
+    elif mach.startswith("ppc"):
+        return "powerpc"
+    elif mach.startswith("riscv"):
+        return "riscv"
+    elif mach.startswith("mips"):
+        return "mips"
+    elif mach.startswith("s390"):
+        return "s390"
+    elif mach.startswith("sparc"):
+        return "sparc"
+    elif mach.startswith("parisc"):
+        return "parisc"
+    elif mach.startswith("sh"):
+        return "sh"
+    elif mach.startswith("loongarch"):
+        return "loongarch"
+    elif fnmatch.fnmatch(mach, "i?86"):
+        return "i386"
+    else:
+        return mach
+
 class Package:
     def __init__(self, name, version, pkgpath, pkgconf, cfgdata):
         self.name = name
@@ -177,14 +217,17 @@ class Package:
             raise CkmsError(f"'{self.name}' has no kernel modules")
 
     def ensure_builtins(self, kerndir, kernmach, kernver):
+        kernarch = machine_to_arch(kernmach)
         gen = self.cfgdata["general"]
         gen["kernel_hdrdir"] = str(kerndir)
         gen["kernel_machine"] = kernmach
         gen["kernel_version"] = kernver
+        gen["kernel_arch"] = kernarch
         # expose for hooks
         self.env["CKMS_KERNEL_HDRDIR"] = str(kerndir)
         self.env["CKMS_KERNEL_VERSION"] = kernver
         self.env["CKMS_KERNEL_MACHINE"] = kernmach
+        self.env["CKMS_KERNEL_ARCH"] = kernarch
 
     def add_cfg_env(self):
         # add extra make args first

@@ -124,6 +124,10 @@ can be referenced from other fields using the standard interpolation.
 *kernel\_machine*
 	The kernel architecture, i.e. _uname -m_.
 
+*kernel\_arch*
+	The kernel source tree architecture, i.e. what you would pass as _ARCH_.
+	Not the same as machine, e.g. for _ppc64le_ this is _powerpc_.
+
 *kernel\_version*
 	The kernel version.
 
@@ -168,6 +172,10 @@ needs to be used with care.
 
 *CKMS\_KERNEL\_MACHINE*
 	The kernel architecture, i.e. _uname -m_.
+
+*CKMS\_KERNEL\_ARCH*
+	The kernel source tree architecture, i.e. what you would pass as _ARCH_.
+	Not the same as machine, e.g. for _ppc64le_ this is _powerpc_.
 
 *CKMS\_MAKE\_ARGS*
 	The arguments to pass to _MAKE_. This is a mixture of implicit make
