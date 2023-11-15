@@ -324,10 +324,13 @@ def read_package(pkgpath, by_name = False, check_source = True, guess_ver = Fals
     if by_name:
         pkgpath = get_pkgpath(pkgpath, guess_ver)
     else:
-        pkgpath = pathlib.Path(pkgpath)
+        pkgpath = pathlib.Path(pkgpath).resolve()
 
-    if not pkgpath.is_dir():
-        raise CkmsError(f"package path '{pkgpath}' does not exist")
+    try:
+        if not pkgpath.is_dir():
+            raise CkmsError(f"package path '{pkgpath}' does not exist")
+    except PermissionError:
+        raise CkmsError(f"no permissions to read package path '{pkgpath}'")
 
     if check_source and by_name:
         srcp = pkgpath / "source"
