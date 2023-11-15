@@ -400,7 +400,7 @@ def do_remove(cmd):
     can_rm = True
 
     for f in pkg.pkgpath.iterdir():
-        if f.name == "source" or f.name == "build":
+        if f.name == "source" or f.name == "build" or f.name == "ckms.ini":
             continue
         log(f"{cmd[1]} still built for '{f.name}'")
         can_rm = False
@@ -409,6 +409,7 @@ def do_remove(cmd):
         raise CkmsError(f"'{pkg.pkgpath}' has built modules")
 
     (pkg.pkgpath / "source").unlink(missing_ok = True)
+    (pkg.pkgpath / "ckms.ini").unlink(missing_ok = True)
 
     if (pkg.pkgpath / "build").is_dir():
         shutil.rmtree(pkg.pkgpath / "build")
