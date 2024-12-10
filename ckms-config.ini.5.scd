@@ -50,6 +50,12 @@ This is everything in the section _[ckms]_.
 
 	The default is _/etc/ckms/refresh-initramfs.sh_.
 
+*depmod\_hook* _(path)_
+	Path to the executable that is invoked to perform _depmod_ for a kernel.
+	This can be a shell script and can be supplied by the distribution.
+
+	If it does not exist, internal _depmod_ logic is used.
+
 *make\_build\_args*
 	Additional arguments to be provided in _CKMS\_MAKE\_ARGS_ in the build
 	environment of a package. They are always added to the very end, after
