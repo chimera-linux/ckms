@@ -20,7 +20,7 @@ opt_destdir = str(kern_path)
 
 opt_confpath = "/etc/ckms/config.ini"
 opt_initramfs = "/etc/ckms/refresh-initramfs.sh"
-opt_depmod = "/etc/ckms/depmod.sh"
+opt_depmodh = "/etc/ckms/depmod.sh"
 opt_stripcmd = "strip -g"
 opt_makeargs = ""
 opt_makeenv = None
@@ -540,9 +540,9 @@ def do_depmod(pkg):
 
     if opt_depmod and rdest == kdest:
         # if depmod hook is present, use it instead
-        if pathlib.Path(opt_depmod).is_file():
+        if pathlib.Path(opt_depmodh).is_file():
             if pkg.do(
-                opt_depmod, opt_kernver, cwd = rdest, env = dict(os.environ)
+                opt_depmodh, opt_kernver, cwd = rdest, env = dict(os.environ)
             ).returncode != 0:
                 raise CkmsError(f"depmod hook failed for {opt_kernver}")
             return True
@@ -731,7 +731,7 @@ def main():
     global opt_confpath, opt_kernver, opt_pkgconf, opt_quiet
     global opt_depmod, opt_machine, opt_jobs, opt_comp, opt_statedir, opt_destdir
     global use_colors, opt_stripcmd, opt_makeargs, opt_makeenv, opt_initramfs
-    global opt_depmod
+    global opt_depmodh
 
     parser = argparse.ArgumentParser(
         description = "Chimera Kernel Module System"
@@ -796,7 +796,7 @@ def main():
     opt_stripcmd = ckcfg.get("strip", fallback = opt_stripcmd)
     opt_makeargs = ckcfg.get("make_build_args", fallback = opt_makeargs)
     opt_initramfs = ckcfg.get("initramfs_hook", fallback = opt_initramfs)
-    opt_depmod = ckcfg.get("depmod_hook", fallback = opt_depmod)
+    opt_depmodh = ckcfg.get("depmod_hook", fallback = opt_depmodh)
     if "build_env" in gcfg:
         opt_makeenv = gcfg["build_env"]
 
