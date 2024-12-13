@@ -632,6 +632,20 @@ def do_uninstall(cmd):
 
     pkg.ensure_builtins(kernhdrs, opt_machine, opt_kernver)
 
+    slinkn = f"kernel-{opt_kernver}-{opt_machine}"
+    slinkp = pkg.pkgpath.parent / slinkn
+
+    slinkr = slinkp.resolve()
+    # installed module does not match this...
+    if slinkr.is_dir() and slinkr.parent.parent.name != pkg.pkgver:
+        return
+
+    slinkp.unlink(missing_ok = True)
+
+    # not installed
+    if not (pkg.pkgpath / opt_kernver).is_dir():
+        return
+
     for modn, mpath, mdest, dostrip in pkg.modules:
         dpath = kernpath / mdest
         if not dpath.is_dir():
@@ -647,10 +661,6 @@ def do_uninstall(cmd):
         except OSError:
             # stop at first non-empty
             pass
-
-    slinkn = f"kernel-{opt_kernver}-{opt_machine}"
-    slinkp = pkg.pkgpath.parent / slinkn
-    slinkp.unlink(missing_ok = True)
 
     # only do this if the kernel still exists
     if (kernpath / "modules.order").is_file() and do_depmod(pkg):
