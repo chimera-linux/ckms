@@ -88,6 +88,14 @@ the commands.
 	The compression method to use for modules. By default, no compression
 	is used. The valid methods are _gz_, _xz_ and _zst_.
 
+*--sign* _KEY,CERT_
+	Use the given private key and cert. Equivalent to the _sign\_key_ and
+	_sign\_cert_ options in the configuration file. Used unless the kernel
+	headers provide a key. You also need to provide the x509 certificate and
+	both have to exist, or this gets ignored. Can be specified either as two
+	comma-separated paths, or a single path, in which case the _.pem_ and
+	_.x509_ suffixes get appended.
+
 # COMMANDS
 
 These commands are permitted, along with their options.

@@ -61,6 +61,24 @@ This is everything in the section _[ckms]_.
 	environment of a package. They are always added to the very end, after
 	any arguments implicitly set up by CKMS.
 
+*sign\_key*
+	The private key used for module signing. If unset, _certs/signing\_key.pem_
+	will be checked in the kernel headers directory. If neither exist, the
+	module will not be signed.
+
+	For the signing to happen, the kernel headers directory additionally needs
+	to contain the _sign-file_ binary in its _scripts_ directory. The kernel
+	dotconfig also needs to have signing enabled.
+
+	In general, the kernel key will exist when using self-built kernels, while
+	the config key will be something like the user's custom key enrolled in the
+	MOK. If the kernel key exists, it will be preferred first, as that is the
+	key used to sign the rest of the kernel's modules, which is always better.
+
+*sign\_cert*
+	The x509 certificate counterpart of _sign\_key_. Both have to exist for the
+	signing to happen. The kernel path is _certs/signing\_key.x509_.
+
 # BUILD ENVIRONMENT
 
 It is additionally possible to globally influence the build environment of
